@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "es2015",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "outDir": "static/",
+        "target": "es2015"
+    },
+    "files": [
+        "src/client/main.ts",
+        "src/client/WebSocketClient.ts"
+    ]
+}

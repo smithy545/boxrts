@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+yarn.lock
+build/
+external/
+node_modules/
