@@ -5,11 +5,14 @@
         "removeComments": true,
         "preserveConstEnums": true,
         "sourceMap": true,
-        "outDir": "static/",
-        "target": "es2015"
+        "outDir": "static",
+        "target": "es2015",
+        "baseUrl": "client",
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "moduleResolution": "node"
     },
-    "files": [
-        "src/client/main.ts",
-        "src/client/WebSocketClient.ts"
+    "include": [
+        "client/**/*"
     ]
 }

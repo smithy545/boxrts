@@ -10,7 +10,7 @@ add_subdirectory(external/json-schema-validator)
 add_subdirectory(external/utils)
 
 include_directories(
-src/server
+.
 external/cute_headers
 external/entt/src
 external/fmt/include
@@ -37,5 +37,5 @@ link_libraries(
 	ssl
 )
 add_executable(shapewar
-src/server/main.cpp
-src/server/server.cpp)
+server/main.cpp
+server/server.cpp)

@@ -1,9 +1,15 @@
-import { WebSocketClient } from "./WebSocketClient.js";
+import { WebSocketClient, WebSocketConfig } from "./WebSocketClient.js";
+import * as constants from "./constants.json";
 
 function main() {
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
     const gl = canvas.getContext("webgl") as WebGLRenderingContext;
-    const server: WebSocketClient = new WebSocketClient();
+    const config_file = `${location.hostname}`
+    const config: WebSocketConfig = {
+        address: `${location.hostname}`,
+        port: constants["port"]
+    };
+    const server: WebSocketClient = new WebSocketClient(config);
     server.open();
 
     if(gl === null) {

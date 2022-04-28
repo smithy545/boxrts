@@ -1,7 +1,13 @@
-client:
+all: client server
+
+client: client/*
 	tsc
 
-server:
+server: server/*
 	cmake -S . -B build && cd build && make
 
-all: client server
+test:
+	yarn run live-server
+
+clean:
+	rm -fr build && rm static/*.js.*

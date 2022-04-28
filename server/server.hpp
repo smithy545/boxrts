@@ -1,4 +1,3 @@
-
 #ifndef SHAPEWAR_SERVER_H
 #define SHAPEWAR_SERVER_H
 
@@ -31,7 +30,7 @@ private:
 
 class WebSocketServer {
 public:
-    WebSocketServer(boost::asio::io_context& io_context);
+    WebSocketServer(boost::asio::io_context& io_context, unsigned int port);
 private:
     boost::asio::io_context& m_io_context;
     tcp::acceptor m_acceptor;
