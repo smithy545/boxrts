@@ -22,11 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include <chrono>
 #include <httplib.h>
 #include <iostream>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <server/websocket_server.hpp>
+#include <server/world.hpp>
 #include <thread>
 
 
@@ -47,7 +49,7 @@ int main() {
         std::cerr << "Error reading config: " << e.what() << std::endl;
         return -1;
     }
-    
+
     std::cout << "Starting static file server on " << http_port << std::endl;
     std::thread http_server_thread([http_port]() {
         try {
@@ -57,22 +59,37 @@ int main() {
             else
                 http_server.listen("0.0.0.0", http_port);
         } catch(std::exception& e) {
-            std::cerr << "Error setting up http server: " << e.what() << std::endl;
+            std::cerr << "Error on http server: " << e.what() << std::endl;
         }
     });
 
+    // load world
+    auto world_ptr = std::make_shared<world>();
     std::cout << "Starting socket server on " << socket_port << std::endl;
-    std::thread socket_server_thread([socket_port]() {
+    std::thread socket_server_thread([socket_port, world_ptr]() {
         try {
-            websocket_server socket_server;
+            websocket_server socket_server(world_ptr);
             socket_server.run(socket_port);
         } catch(std::exception& e) {
-            std::cerr << "Error setting up websocket server: " << e.what() << std::endl;
+            std::cerr << "Error on websocket server: " << e.what() << std::endl;
         }
     });
 
-    http_server_thread.join();
+    std::cout << "Starting world thread..." << std::endl;
+    std::thread world_thread([world_ptr]() {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        world::ns dt_ns{0};
+        for(;;) {
+            auto frame_start = std::chrono::high_resolution_clock::now();
+            world_ptr->update(dt_ns);
+            auto frame_end = std::chrono::high_resolution_clock::now();
+            dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
+        }
+    });
+
     socket_server_thread.join();
+    http_server_thread.join();
+    world_thread.join();
 
     std::cout << "End." << std::endl;
     return 0;

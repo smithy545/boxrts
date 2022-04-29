@@ -22,40 +22,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SHAPEWAR_WEBSOCKET_SERVER_HPP
-#define SHAPEWAR_WEBSOCKET_SERVER_HPP
+#ifndef SHAPEWAR_WORLD_HPP
+#define SHAPEWAR_WORLD_HPP
 
-#include <server/world.hpp>
-#include <set>
-#include <websocketpp/config/asio_no_tls.hpp>
-#include <websocketpp/server.hpp>
+#include <entt/entt.hpp>
+#include <utils/macros.h>
 
-
-using websocketpp::connection_hdl;
 
 namespace shapewar {
 
-class websocket_server {
+class world : public entt::emitter<world> {
 public:
-    typedef websocketpp::server<websocketpp::config::asio> server_base;
+    PTR(world);
 
-    websocket_server(world::Ptr world_ptr);
+    typedef unsigned long long ns;
 
-    void on_open(connection_hdl hdl);
-
-    void on_close(connection_hdl hdl);
-
-    void on_message(connection_hdl hdl, server_base::message_ptr msg);
-
-    void run(uint16_t port);
-private:
-    typedef std::set<connection_hdl,std::owner_less<connection_hdl>> con_list;
-
-    server_base m_server;
-    con_list m_connections;
-    world::Ptr m_world{nullptr};
+    void update(ns dt_ns);
 };
 
 } // namespace shapewar
 
-#endif //SHAPEWAR_WEBSOCKET_SERVER_HPP
+#endif //SHAPEWAR_WORLD_HPP

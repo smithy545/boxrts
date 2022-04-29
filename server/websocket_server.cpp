@@ -31,7 +31,7 @@ using websocketpp::lib::bind;
 
 namespace shapewar {
 
-websocket_server::websocket_server() {
+websocket_server::websocket_server(world::Ptr world_ptr): m_world(world_ptr) {
     m_server.init_asio();
 
     m_server.set_open_handler(bind(&websocket_server::on_open,this,::_1));
@@ -48,9 +48,20 @@ void websocket_server::on_close(connection_hdl hdl) {
 }
 
 void websocket_server::on_message(connection_hdl hdl, websocket_server::server_base::message_ptr msg) {
-    for (auto it : m_connections) {
-        m_server.send(it,msg);
+    if(m_connections.contains(hdl)) {
+        std::string payload = msg->get_payload();
+        auto delimiter_loc = payload.find(":");
+        if(delimiter_loc == -1) {
+            std::cerr << "Malformed message" << std::endl;
+            return;
+        }
+        std::string event = payload.substr(0, delimiter_loc);
+        std::string data = payload.substr(delimiter_loc + 1, payload.size() - delimiter_loc - 1);
+        std::cout << "Event: " << event << std::endl;
+        std::cout << "Data: " << data << std::endl;
+        return;
     }
+    std::cerr << "Message from unkown source" << std::endl;
 }
 
 void websocket_server::run(uint16_t port) {

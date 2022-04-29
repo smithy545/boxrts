@@ -3,6 +3,7 @@ project(shapewar C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+add_subdirectory(external/entt)
 add_subdirectory(external/json)
 add_subdirectory(external/utils)
 
@@ -13,6 +14,7 @@ add_subdirectory(external/websocketpp)
 include_directories(
 .
 external/cpp-httplib
+external/entt/src
 external/json/include
 external/utils/include
 external/websocketpp
@@ -24,11 +26,12 @@ link_directories(
 /opt/homebrew/opt/openssl/lib)
 
 link_libraries(
-	nlohmann_json
+	EnTT
 	utils
 	crypto
 	ssl
 )
 add_executable(shapewar
 server/main.cpp
-server/websocket_server.cpp)
+server/websocket_server.cpp
+server/world.cpp)
