@@ -9,6 +9,10 @@ add_subdirectory(external/json)
 add_subdirectory(external/json-schema-validator)
 add_subdirectory(external/utils)
 
+set(BUILD_EXAMPLES FALSE)
+set(BUILD_TESTS FALSE)
+add_subdirectory(external/websocketpp)
+
 include_directories(
 .
 external/cute_headers
@@ -18,6 +22,7 @@ external/freetype/include
 external/json/include
 external/json-schema-validator/src
 external/utils/include
+external/websocketpp
 /opt/homebrew/Cellar/boost/1.76.0/include
 /opt/homebrew/Cellar/bullet/3.17/include/bullet
 /opt/homebrew/opt/openssl/include)
@@ -38,4 +43,4 @@ link_libraries(
 )
 add_executable(shapewar
 server/main.cpp
-server/server.cpp)
+server/websocket_server.cpp)
