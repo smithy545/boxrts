@@ -27,6 +27,7 @@ link_directories(
 
 link_libraries(
 	EnTT
+	nlohmann_json
 	utils
 	crypto
 	ssl
