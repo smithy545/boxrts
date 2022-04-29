@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include <server/event.hpp>
 #include <server/websocket_server.hpp>
 
 
@@ -34,9 +35,10 @@ namespace shapewar {
 websocket_server::websocket_server(world::Ptr world_ptr): m_world(world_ptr) {
     m_server.init_asio();
 
-    m_server.set_open_handler(bind(&websocket_server::on_open,this,::_1));
-    m_server.set_close_handler(bind(&websocket_server::on_close,this,::_1));
-    m_server.set_message_handler(bind(&websocket_server::on_message,this,::_1,::_2));
+    m_server.set_open_handler(bind(&websocket_server::on_open, this, ::_1));
+    m_server.set_close_handler(bind(&websocket_server::on_close, this, ::_1));
+    m_server.set_message_handler(bind(&websocket_server::on_message, this, ::_1, ::_2));
+    m_server.set_fail_handler(bind(&websocket_server::on_fail, this, ::_1));
 }
 
 void websocket_server::on_open(connection_hdl hdl) {
@@ -55,13 +57,16 @@ void websocket_server::on_message(connection_hdl hdl, websocket_server::server_b
             std::cerr << "Malformed message" << std::endl;
             return;
         }
-        std::string event = payload.substr(0, delimiter_loc);
+        std::string name = payload.substr(0, delimiter_loc);
         std::string data = payload.substr(delimiter_loc + 1, payload.size() - delimiter_loc - 1);
-        std::cout << "Event: " << event << std::endl;
-        std::cout << "Data: " << data << std::endl;
+        m_world->publish<event>(name, data);
         return;
     }
     std::cerr << "Message from unkown source" << std::endl;
+}
+
+void websocket_server::on_fail(connection_hdl hdl) {
+    std::cerr << "Incoming connection failed" << std::endl;
 }
 
 void websocket_server::run(uint16_t port) {

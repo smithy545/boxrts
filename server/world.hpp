@@ -37,6 +37,8 @@ public:
 
     typedef unsigned long long ns;
 
+    world();
+
     void update(ns dt_ns);
 };
 

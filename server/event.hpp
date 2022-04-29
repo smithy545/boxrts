@@ -22,23 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <iostream>
-#include <server/world.hpp>
-#include <server/event.hpp>
+#ifndef SHAPEWAR_EVENT_HPP
+#define SHAPEWAR_EVENT_HPP
+
+#include <string>
 
 
 namespace shapewar {
 
-world::world() {
-    on<event>([](event& ev, world& emitter) {
-        std::cout << "Event: " << ev.name << std::endl;
-        std::cout << "Data: " << ev.payload << std::endl;
-    });
-}
-
-void world::update(ns dt_ns) {
-    for(auto i{0};i<10000000l;i++);
-    //std::cout << dt_ns << "ns fps " << (1000000000./dt_ns) << std::endl;
-}
+struct event {
+    std::string name;
+    std::string payload;
+};
 
 } // namespace shapewar
+
+#endif //SHAPEWAR_EVENT_HPP

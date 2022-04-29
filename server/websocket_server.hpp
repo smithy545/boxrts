@@ -47,6 +47,8 @@ public:
 
     void on_message(connection_hdl hdl, server_base::message_ptr msg);
 
+    void on_fail(connection_hdl hdl);
+
     void run(uint16_t port);
 private:
     typedef std::set<connection_hdl,std::owner_less<connection_hdl>> con_list;
