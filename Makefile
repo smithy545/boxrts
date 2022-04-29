@@ -7,7 +7,7 @@ server: server/*
 	cmake -S . -B build && cd build && make
 
 test:
-	yarn run live-server
+	build/shapewar
 
 clean:
 	rm -fr build && rm static/*.js && rm static/*.js.*
