@@ -10,4 +10,4 @@ test:
 	yarn run live-server
 
 clean:
-	rm -fr build && rm static/*.js.*
+	rm -fr build && rm static/*.js && rm static/*.js.*
