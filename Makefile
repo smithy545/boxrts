@@ -6,7 +6,7 @@ client: client/*
 server: server/*
 	cmake -S . -B build && cd build && make
 
-test:
+test: client server
 	build/shapewar
 
 clean:
