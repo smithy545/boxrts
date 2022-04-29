@@ -35,7 +35,8 @@ function readJsonFile(path: string, callback: Function) {
         }
     }
     xhr.onerror = (e) => {
-        console.error(`Could not load file from ${path}\nError: ${e}`);
+        console.error(`Could not load file from ${path}`);
+        console.error(e);
     }
     xhr.open("GET", path, true);
     xhr.send();
