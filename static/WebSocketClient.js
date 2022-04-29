@@ -4,7 +4,10 @@ class WebSocketClient {
     }
     open() {
         console.log("Opening socket connection to server...");
-        this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
+        if (this.config.port !== null)
+            this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
+        else
+            this.connection = new WebSocket(`ws://${this.config.address}`);
         this.connection.addEventListener("open", (event) => {
             console.info("Connection opened");
             this.connection.send("test hello");

@@ -22,28 +22,58 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include <httplib.h>
 #include <iostream>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <server/websocket_server.hpp>
+#include <thread>
 
 
 using namespace shapewar;
 
 int main() {
-    std::cout << "reading config" << std::endl;
+    std::cout << "Reading config..." << std::endl;
 
-    std::ifstream constants_stream("/Users/philipsmith/Documents/geomwars/static/constants.json");
-    nlohmann::json constants_json = nlohmann::json::parse(constants_stream);
-    unsigned int port = constants_json["port"];
-
-    std::cout << "starting socket server on " << port << std::endl;
+    // default config values
+    unsigned int http_port = 8080;
+    unsigned int socket_port = 8080;
     try {
-        websocket_server server;
-        server.run(port);
+        std::ifstream constants_stream("./static/constants.json");
+        nlohmann::json constants_json = nlohmann::json::parse(constants_stream);
+        http_port = constants_json["http_port"];
+        socket_port = constants_json["socket_port"];
     } catch(std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        std::cerr << "Error reading config: " << e.what() << std::endl;
+        return -1;
     }
+    
+    std::cout << "Starting static file server on " << http_port << std::endl;
+    std::thread http_server_thread([http_port]() {
+        try {
+            httplib::Server http_server;
+            if(!http_server.set_mount_point("/", "./static"))
+                std::cerr << "Error mounting static file directory. Make sure specified directory exists." << std::endl;
+            else
+                http_server.listen("0.0.0.0", http_port);
+        } catch(std::exception& e) {
+            std::cerr << "Error setting up http server: " << e.what() << std::endl;
+        }
+    });
 
-    std::cout << "end" << std::endl;
+    std::cout << "Starting socket server on " << socket_port << std::endl;
+    std::thread socket_server_thread([socket_port]() {
+        try {
+            websocket_server socket_server;
+            socket_server.run(socket_port);
+        } catch(std::exception& e) {
+            std::cerr << "Error setting up websocket server: " << e.what() << std::endl;
+        }
+    });
+
+    http_server_thread.join();
+    socket_server_thread.join();
+
+    std::cout << "End." << std::endl;
+    return 0;
 }

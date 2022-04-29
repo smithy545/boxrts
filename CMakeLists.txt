@@ -15,6 +15,7 @@ add_subdirectory(external/websocketpp)
 
 include_directories(
 .
+external/cpp-httplib
 external/cute_headers
 external/entt/src
 external/fmt/include
