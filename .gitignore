@@ -1,7 +1,5 @@
-yarn.lock
 build/
 external/
-node_modules/
 .vscode/
 *.js
 *.js.*
