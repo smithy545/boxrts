@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SHAPEWAR_WEBSOCKET_SERVER_H
-#define SHAPEWAR_WEBSOCKET_SERVER_H
+#ifndef SHAPEWAR_WEBSOCKET_SERVER_HPP
+#define SHAPEWAR_WEBSOCKET_SERVER_HPP
 
 #include <set>
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -56,4 +56,4 @@ private:
 
 } // namespace shapewar
 
-#endif //SHAPEWAR_WEBSOCKET_SERVER_H
+#endif //SHAPEWAR_WEBSOCKET_SERVER_HPP
