@@ -22,16 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <chrono>
 #include <httplib.h>
 #include <iostream>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <server/websocket_server.hpp>
-#include <server/world.hpp>
+#include <server/world_server.hpp>
 #include <thread>
 
 
+using namespace nlohmann;
 using namespace shapewar;
 
 int main() {
@@ -40,11 +39,13 @@ int main() {
     // default config values
     unsigned int http_port = 8080;
     unsigned int socket_port = 8080;
+    json event_codes;
     try {
         std::ifstream constants_stream("./static/constants.json");
-        nlohmann::json constants_json = nlohmann::json::parse(constants_stream);
+        json constants_json = nlohmann::json::parse(constants_stream);
         http_port = constants_json["http_port"];
         socket_port = constants_json["socket_port"];
+        event_codes = constants_json["event_codes"];
     } catch(std::exception& e) {
         std::cerr << "Error reading config: " << e.what() << std::endl;
         return -1;
@@ -63,33 +64,11 @@ int main() {
         }
     });
 
-    // load world
-    auto world_ptr = std::make_shared<world>();
-    std::cout << "Starting socket server on " << socket_port << std::endl;
-    std::thread socket_server_thread([socket_port, world_ptr]() {
-        try {
-            websocket_server socket_server(world_ptr);
-            socket_server.run(socket_port);
-        } catch(std::exception& e) {
-            std::cerr << "Error on websocket server: " << e.what() << std::endl;
-        }
-    });
+    std::cout << "Starting world server on " << socket_port << std::endl;
+    world_server game_server;
+    game_server.run(socket_port);
 
-    std::cout << "Starting world thread..." << std::endl;
-    std::thread world_thread([world_ptr]() {
-        auto start_time = std::chrono::high_resolution_clock::now();
-        world::ns dt_ns{0};
-        for(;;) {
-            auto frame_start = std::chrono::high_resolution_clock::now();
-            world_ptr->update(dt_ns);
-            auto frame_end = std::chrono::high_resolution_clock::now();
-            dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
-        }
-    });
-
-    socket_server_thread.join();
     http_server_thread.join();
-    world_thread.join();
 
     std::cout << "End." << std::endl;
     return 0;

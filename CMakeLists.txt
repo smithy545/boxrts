@@ -34,5 +34,4 @@ link_libraries(
 )
 add_executable(shapewar
 server/main.cpp
-server/websocket_server.cpp
-server/world.cpp)
+server/world_server.cpp)

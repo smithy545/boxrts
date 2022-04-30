@@ -22,26 +22,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SHAPEWAR_WORLD_HPP
-#define SHAPEWAR_WORLD_HPP
+#ifndef SHAPEWAR_PLAYER_HPP
+#define SHAPEWAR_PLAYER_HPP
 
-#include <entt/entt.hpp>
-#include <utils/macros.h>
 
 
 namespace shapewar {
 
-class world : public entt::emitter<world> {
-public:
-    PTR(world);
+struct player {
 
-    typedef unsigned long long ns;
-
-    world();
-
-    void update(ns dt_ns);
 };
 
 } // namespace shapewar
 
-#endif //SHAPEWAR_WORLD_HPP
+#endif //SHAPEWAR_PLAYER_HPP

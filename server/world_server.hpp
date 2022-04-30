@@ -22,29 +22,42 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#ifndef SHAPEWAR_WORLD_SERVER_HPP
+#define SHAPEWAR_WORLD_SERVER_HPP
+
 #include <entt/entt.hpp>
-#include <iostream>
-#include <server/serialized_event.hpp>
-#include <server/world.hpp>
+#include <map>
+#include <server/player.hpp>
+#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/server.hpp>
 
 
-using namespace entt::literals;
+using websocketpp::connection_hdl;
 
 namespace shapewar {
 
-world::world() {
-    on<serialized_event>([](serialized_event& ev, world& emitter) {
-        switch(ev.code) {
-            default:
-                std::cout << "event code" << ev.code << std::endl;
-                std::cout << "payload: " << ev.payload << std::endl;
-        }
-    });
-}
+class world_server : public entt::emitter<world_server> {
+public:
+    typedef websocketpp::server<websocketpp::config::asio> server_base;
 
-void world::update(ns dt_ns) {
-    for(auto i{0};i<10000000l;i++);
-    //std::cout << dt_ns << "ns fps " << (1000000000./dt_ns) << std::endl;
-}
+    world_server();
+
+    void on_open(connection_hdl hdl);
+
+    void on_close(connection_hdl hdl);
+
+    void on_message(connection_hdl hdl, server_base::message_ptr msg);
+
+    void on_fail(connection_hdl hdl);
+
+    void run(uint16_t port);
+private:
+    typedef std::map<connection_hdl, player, std::owner_less<connection_hdl>> con_list;
+
+    server_base m_server;
+    con_list m_connections;
+};
 
 } // namespace shapewar
+
+#endif //SHAPEWAR_WORLD_SERVER_HPP
