@@ -43,7 +43,11 @@ class WebSocketClient {
             this.connection = new WebSocket(`ws://${this.config.address}`);
         this.connection.addEventListener("open", (event: Event) => {
             console.info("Connection opened");
-            this.connection.send("debug:Sending test event");
+            let buf = new ArrayBuffer(2);
+            let view = new Uint8Array(buf);
+            view[0] = "H".charCodeAt(0);
+            view[1] = "I".charCodeAt(0);
+            this.connection.send(buf);
         });
         this.connection.addEventListener("error", (event: ErrorEvent) => {
             console.error(event);

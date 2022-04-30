@@ -22,29 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <entt/entt.hpp>
-#include <iostream>
-#include <server/serialized_event.hpp>
-#include <server/world.hpp>
+#ifndef SHAPEWAR_ENCODED_EVENT_HPP
+#define SHAPEWAR_ENCODED_EVENT_HPP
 
+#include <string>
 
-using namespace entt::literals;
 
 namespace shapewar {
 
-world::world() {
-    on<serialized_event>([](serialized_event& ev, world& emitter) {
-        switch(ev.code) {
-            default:
-                std::cout << "event code" << ev.code << std::endl;
-                std::cout << "payload: " << ev.payload << std::endl;
-        }
-    });
-}
-
-void world::update(ns dt_ns) {
-    for(auto i{0};i<10000000l;i++);
-    //std::cout << dt_ns << "ns fps " << (1000000000./dt_ns) << std::endl;
-}
+struct serialized_event {
+    std::uint16_t code;
+    std::string payload;
+};
 
 } // namespace shapewar
+
+#endif //SHAPEWAR_ENCODED_EVENT_HPP

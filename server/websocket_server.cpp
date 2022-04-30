@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <server/event.hpp>
+#include <server/serialized_event.hpp>
 #include <server/websocket_server.hpp>
 
 
@@ -52,14 +52,8 @@ void websocket_server::on_close(connection_hdl hdl) {
 void websocket_server::on_message(connection_hdl hdl, websocket_server::server_base::message_ptr msg) {
     if(m_connections.contains(hdl)) {
         std::string payload = msg->get_payload();
-        auto delimiter_loc = payload.find(":");
-        if(delimiter_loc == -1) {
-            std::cerr << "Malformed message" << std::endl;
-            return;
-        }
-        std::string name = payload.substr(0, delimiter_loc);
-        std::string data = payload.substr(delimiter_loc + 1, payload.size() - delimiter_loc - 1);
-        m_world->publish<event>(name, data);
+        std::uint16_t code = (payload[0] << 8) & payload[1];
+        m_world->publish<serialized_event>(code, payload.substr(2, payload.size() - 2));
         return;
     }
     std::cerr << "Message from unkown source" << std::endl;
