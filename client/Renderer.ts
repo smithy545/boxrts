@@ -22,39 +22,91 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { Camera } from "./Camera.js";
+
+
+declare var window: any;
+
+
+interface ShaderProgram {
+    program: WebGLProgram;
+    attribLocations: {[attributeName: string]: GLint};
+    uniformLocations: {[uniformName: string]: WebGLUniformLocation};
+}
+
+interface VertexAttribute {
+    buffer: WebGLBuffer;
+    numComponents: number;
+    type: GLenum;
+    normalize: boolean;
+    stride: number;
+    offset: number;
+};
+
+interface IndexAttribute {
+    buffer: WebGLBuffer;
+    count: number;
+    type: GLenum;
+    offset: number;
+};
+
+interface Renderable {
+    attributes: {[name: string]: VertexAttribute};
+    indexAttribute: IndexAttribute;
+};
+
 class Renderer {
+    camera: Camera;
     gl: WebGLRenderingContext;
-    activeProgram: WebGLProgram;
-    buffers: Array<WebGLBuffer>;
-    vertexAttribArrays: Int8Array;
-    cubeRotation: number;
+    activeProgram: ShaderProgram;
+    loadedObjects: Array<Renderable>;
 
     constructor(context: WebGLRenderingContext) {
-        this.cubeRotation = 0.0;
-        this.buffers = [];
+        this.loadedObjects = [];
         this.gl = context;
-        this.activeProgram = this.loadShaderProgram(`
+        let program = this.loadShaderProgram(`
             attribute vec4 aVertexPosition;
             attribute vec4 aVertexColor;
             uniform mat4 uModelViewMatrix;
             uniform mat4 uProjectionMatrix;
             varying lowp vec4 vColor;
             void main(void) {
-            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-            vColor = aVertexColor;
-            }
-        `, `
-        varying lowp vec4 vColor;
-        void main(void) {
-            gl_FragColor = vColor;
+                gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+                vColor = aVertexColor;
+            }`,`
+            varying lowp vec4 vColor;
+            void main(void) {
+                gl_FragColor = vColor;
+            }`
+        );
+        if(program === null) {
+            console.error("Error loading initial program.");
+            return;
         }
-        `);
-        
-        this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear to black
-        this.gl.clearDepth(1.0); // clear depth
+        this.activeProgram = {
+            program: program,
+            attribLocations: {
+                vertexPosition: this.gl.getAttribLocation(program, 'aVertexPosition'),
+                vertexColor: this.gl.getAttribLocation(program, 'aVertexColor'),
+            },
+            uniformLocations: {
+                projectionMatrix: this.gl.getUniformLocation(program, 'uProjectionMatrix'),
+                modelViewMatrix: this.gl.getUniformLocation(program, 'uModelViewMatrix'),
+            }
+        };
+        this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
+        this.gl.clearDepth(1.0); // clear depth buffer
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL); // near things obscure far things
 
+        // camera setup
+        this.camera = new Camera(this.gl.canvas.width, this.gl.canvas.height);
+
+        this.setupScene();
+    }
+
+    setupScene() {
+        // cube verts/colors/indices
         const positions = [
             // Front face
             -1.0, -1.0,  1.0,
@@ -92,11 +144,6 @@ class Renderer {
             -1.0,  1.0,  1.0,
             -1.0,  1.0, -1.0,
         ];
-        let buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buf);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        this.buffers.push(buf);
-
         const faceColors = [
             [1.0,  1.0,  1.0,  1.0],    // Front face: white
             [1.0,  0.0,  0.0,  1.0],    // Back face: red
@@ -110,13 +157,6 @@ class Renderer {
             const c = faceColors[i];
             colors = colors.concat(c,c,c,c);
         }
-        buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buf);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
-        this.buffers.push(buf);
-
-        buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buf);
         const indices = [
             0,  1,  2,      0,  2,  3,    // front
             4,  5,  6,      4,  6,  7,    // back
@@ -125,75 +165,98 @@ class Renderer {
             16, 17, 18,     16, 18, 19,   // right
             20, 21, 22,     20, 22, 23,   // left
         ];
-        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-        this.buffers.push(buf);
 
+        // vert buffer
+        let vertex_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        // color buffer
+        let color_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+        // index buffer
+        let index_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+        this.loadedObjects.push({
+            attributes:{
+                vertex: {
+                    numComponents: 3,
+                    type: this.gl.FLOAT,
+                    normalize: false,
+                    stride: 0,
+                    offset: 0,
+                    buffer: vertex_buf
+                },
+                color: {
+                    numComponents: 4,
+                    type: this.gl.FLOAT,
+                    normalize: false,
+                    stride: 0,
+                    offset: 0,
+                    buffer: color_buf
+                }
+            },
+            indexAttribute: {
+                buffer: index_buf,
+                count: 36,
+                type: this.gl.UNSIGNED_SHORT,
+                offset: 0
+            }
+        });
     }
 
-    render(mat4: any) {
-        // clear screen
+    render() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         // setup mvp matrix
-        const fieldOfView = 45 * Math.PI / 180;   // in radians
-        const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight;
-        const zNear = 0.1;
-        const zFar = 100.0;
-        const projectionMatrix = mat4.create();
-        mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
-        const modelViewMatrix = mat4.create();
-        mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0,0.0,-6.0]);
-        mat4.rotate(modelViewMatrix, modelViewMatrix, this.cubeRotation, [0,0,1]);
-        mat4.rotate(modelViewMatrix, modelViewMatrix, this.cubeRotation * 0.7, [0,1,0]);
+        const modelViewMatrix = window.mat4.create();
+        const projectionMatrix = window.mat4.create();
+        window.mat4.perspective(projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
+        window.mat4.translate(modelViewMatrix, modelViewMatrix, [0,0,-6]);
 
-        // shader info
-        const programInfo = {
-            program: this.activeProgram,
-            attribLocations: {
-              vertexPosition: this.gl.getAttribLocation(this.activeProgram, 'aVertexPosition'),
-              vertexColor: this.gl.getAttribLocation(this.activeProgram, 'aVertexColor'),
-            },
-            uniformLocations: {
-              projectionMatrix: this.gl.getUniformLocation(this.activeProgram, 'uProjectionMatrix'),
-              modelViewMatrix: this.gl.getUniformLocation(this.activeProgram, 'uModelViewMatrix'),
+        // render objects
+        for(let i = 0; i < this.loadedObjects.length; ++i) {
+            // load verts
+            {
+                let attr = this.loadedObjects[i].attributes.vertex;
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
+                this.gl.vertexAttribPointer(
+                    this.activeProgram.attribLocations.vertexPosition,
+                    attr.numComponents,
+                    attr.type,
+                    attr.normalize,
+                    attr.stride,
+                    attr.offset);
+                this.gl.enableVertexAttribArray(this.activeProgram.attribLocations.vertexPosition);
             }
-        };
-        // load verts
-        {
-            const numComponents = 3;
-            const type = this.gl.FLOAT;
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffers[0]);
-            this.gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition,
-                numComponents, type, normalize, stride, offset);
-            this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+            // load vert colors
+            {
+                let attr = this.loadedObjects[i].attributes.color;
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
+                this.gl.vertexAttribPointer(
+                    this.activeProgram.attribLocations.vertexColor,
+                    attr.numComponents,
+                    attr.type,
+                    attr.normalize,
+                    attr.stride,
+                    attr.offset);
+                this.gl.enableVertexAttribArray(this.activeProgram.attribLocations.vertexColor);
+            }
+            // load indices and draw
+            this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.loadedObjects[i].indexAttribute.buffer);
+            this.gl.useProgram(this.activeProgram.program);
+            this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.projectionMatrix, false, projectionMatrix);
+            this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+            {
+                let attr = this.loadedObjects[i].indexAttribute;
+                this.gl.drawElements(
+                    this.gl.TRIANGLES,
+                    attr.count,
+                    attr.type,
+                    attr.offset);
+            }
         }
-        // load vert colors
-        {
-            const numComponents = 4;
-            const type = this.gl.FLOAT;
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffers[1]);
-            this.gl.vertexAttribPointer(programInfo.attribLocations.vertexColor,
-            numComponents, type, normalize, stride, offset);
-            this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
-        }
-        // load indices and draw
-        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.buffers[2]);
-        this.gl.useProgram(this.activeProgram);
-        this.gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
-        this.gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
-        {
-            const vertexCount = 36;
-            const type = this.gl.UNSIGNED_SHORT;
-            const offset = 0;
-            this.gl.drawElements(this.gl.TRIANGLES, vertexCount, type, offset);
-        }
-        this.cubeRotation += 0.001;
     }
 
     loadShaderProgram(vertexShaderSource: string, fragmentShaderSource: string) : WebGLProgram | null {

@@ -23,30 +23,17 @@ SOFTWARE.
 */
 
 
-function loadJsonFile(path: string, callback: Function, error?: Function) {
-    const xhr = new XMLHttpRequest();
-    xhr.overrideMimeType("application/json");
-    xhr.onreadystatechange = () => {
-        if(xhr.readyState === 4 && xhr.status === 200) {
-            callback(xhr);
-        }
+class Camera {
+    fieldOfView: number; // in radians
+    aspect: number;
+    zNear: number;
+    zFar: number;
+    constructor(width: number, height: number) {
+        this.fieldOfView = 45 * Math.PI / 180;
+        this.aspect = width / height;
+        this.zNear = 0.1;
+        this.zFar = 100.0;
     }
-    xhr.onerror = (e) => {
-        if(typeof error === undefined) {
-            console.error(`Could not load file from ${path}: ${e}`);
-        } else {
-            error(e);
-        }
-    }
-    xhr.open("GET", path, true);
-    xhr.send();
-}
+};
 
-function loadImageFile(src: string, callback: Function) {
-    const img = document.createElement('img');
-    img.addEventListener('load', function() { callback(img); }, false);
-    img.src = src;
-}
-
-
-export { loadJsonFile, loadImageFile };
+export { Camera };

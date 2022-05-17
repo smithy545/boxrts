@@ -22,31 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { Renderer } from "./Renderer.js";
+import { WebSocketClient } from "./WebSocketClient.js";
 
-function loadJsonFile(path: string, callback: Function, error?: Function) {
-    const xhr = new XMLHttpRequest();
-    xhr.overrideMimeType("application/json");
-    xhr.onreadystatechange = () => {
-        if(xhr.readyState === 4 && xhr.status === 200) {
-            callback(xhr);
-        }
+
+class GameClient {
+    constructor(renderer: Renderer, conn: WebSocketClient) {
+        conn.open();
     }
-    xhr.onerror = (e) => {
-        if(typeof error === undefined) {
-            console.error(`Could not load file from ${path}: ${e}`);
-        } else {
-            error(e);
-        }
-    }
-    xhr.open("GET", path, true);
-    xhr.send();
-}
+};
 
-function loadImageFile(src: string, callback: Function) {
-    const img = document.createElement('img');
-    img.addEventListener('load', function() { callback(img); }, false);
-    img.src = src;
-}
-
-
-export { loadJsonFile, loadImageFile };
+export { GameClient };

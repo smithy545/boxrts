@@ -22,12 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { GameClient } from "./GameClient.js";
 import { WebSocketClient, WebSocketConfig } from "./WebSocketClient.js";
 import { Renderer } from "./Renderer.js";
-import { loadJsonFile, loadImageFile } from "./ResourceLoaders.js";
+import { loadJsonFile } from "./ResourceLoaders.js";
 
-
-declare var window: any;
 
 function main() {
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
@@ -44,15 +43,16 @@ function main() {
             port: constants["socket_port"]
         };
         const conn: WebSocketClient = new WebSocketClient(config);
-        conn.open();
-    });
-
-    const renderer = new Renderer(gl);
-    const loop_body = () => {
-        renderer.render(window.mat4);
+        const renderer = new Renderer(gl);
+        const client: GameClient = new GameClient(renderer, conn);
+        const loop_body = () => {
+            renderer.render();
+            window.requestAnimationFrame(loop_body);
+        };
         window.requestAnimationFrame(loop_body);
-    };
-    window.requestAnimationFrame(loop_body);
+    }, (e: any) => {
+        console.error(`Error while loading constants: ${e}`);
+    });
 }
 
 window.onload = main;

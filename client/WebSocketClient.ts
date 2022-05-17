@@ -24,7 +24,7 @@ SOFTWARE.
 
 interface WebSocketConfig {
     address: string;
-    port: number | null;
+    port?: number;
 };
 
 class WebSocketClient {
@@ -37,10 +37,11 @@ class WebSocketClient {
 
     open() {
         console.log("Opening socket connection to server...");
-        if(this.config.port !== null)
+        if(typeof this.config.port !== undefined) {
             this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
-        else
+        } else {
             this.connection = new WebSocket(`ws://${this.config.address}`);
+        }
         this.connection.addEventListener("open", (event: Event) => {
             console.info("Connection opened");
             const buf = new ArrayBuffer(2);
