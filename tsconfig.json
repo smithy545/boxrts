@@ -10,7 +10,8 @@
         "baseUrl": "client",
         "esModuleInterop": true,
         "resolveJsonModule": true,
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "allowJs": true
     },
     "include": [
         "client/**/*"

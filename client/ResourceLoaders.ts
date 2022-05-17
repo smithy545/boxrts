@@ -22,37 +22,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { WebSocketClient, WebSocketConfig } from "./WebSocketClient.js";
-import { Renderer } from "./Renderer.js";
-import { loadJsonFile, loadImageFile } from "./ResourceLoaders.js";
 
-
-declare var window: any;
-
-function main() {
-    const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
-    const gl = canvas.getContext("webgl") as WebGLRenderingContext;
-    if(!gl) {
-        alert("Unable to initialize WebGL. You browser may not support it.");
-        return;
+function loadJsonFile(path: string, callback: Function) {
+    const xhr = new XMLHttpRequest();
+    xhr.overrideMimeType("application/json");
+    xhr.onreadystatechange = () => {
+        if(xhr.readyState === 4 && xhr.status === 200) {
+            callback(xhr);
+        }
     }
-
-    loadJsonFile("./constants.json", (request: XMLHttpRequest) => {
-        const constants = JSON.parse(request.responseText);
-        const config: WebSocketConfig = {
-            address: `${location.hostname}`,
-            port: constants["socket_port"]
-        };
-        const conn: WebSocketClient = new WebSocketClient(config);
-        conn.open();
-    });
-
-    const renderer = new Renderer(gl);
-    const loop_body = () => {
-        renderer.render(window.mat4);
-        window.requestAnimationFrame(loop_body);
-    };
-    window.requestAnimationFrame(loop_body);
+    xhr.onerror = (e) => {
+        console.error(`Could not load file from ${path}`);
+        console.error(e);
+    }
+    xhr.open("GET", path, true);
+    xhr.send();
 }
 
-window.onload = main;
+function loadImageFile(src: string, callback: Function) {
+    const img = document.createElement('img');
+    img.addEventListener('load', function() { callback(img); }, false);
+    img.src = src;
+}
+
+
+export { loadJsonFile, loadImageFile };

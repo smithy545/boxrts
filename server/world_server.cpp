@@ -22,6 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
 #include <chrono>
 #include <server/serialized_event.hpp>
 #include <server/world_server.hpp>
@@ -51,10 +56,12 @@ world_server::world_server() {
 }
 
 void world_server::on_open(connection_hdl hdl) {
+    std::cout << "open " << &hdl << std::endl;
     m_connections.insert({hdl, player{}});
 }
 
 void world_server::on_close(connection_hdl hdl) {
+    std::cout << "close " << &hdl << std::endl;
     m_connections.erase(hdl);
 }
 
@@ -87,12 +94,14 @@ void world_server::run(uint16_t port) {
     unsigned long long dt_ns{0};
     for(;;) {
         auto frame_start = std::chrono::high_resolution_clock::now();
-        for(auto i = 0; i < 10000000l; ++i);
+
+        // do stuff
+        sleep(1);
+
         auto frame_end = std::chrono::high_resolution_clock::now();
         dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
-        auto dt_str = std::to_string(dt_ns);
         for(auto [hdl, player]: m_connections)
-            m_server.send(hdl, dt_str, websocketpp::frame::opcode::TEXT);
+            m_server.send(hdl, std::to_string(dt_ns), websocketpp::frame::opcode::TEXT);
     }
 
     socket_server_thread.join();

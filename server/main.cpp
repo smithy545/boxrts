@@ -38,7 +38,7 @@ int main() {
 
     // default config values
     unsigned int http_port = 8080;
-    unsigned int socket_port = 8080;
+    unsigned int socket_port = 9001;
     json event_codes;
     try {
         std::ifstream constants_stream("./static/constants.json");
