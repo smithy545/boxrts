@@ -50,16 +50,17 @@ interface IndexAttribute {
     offset: number;
 };
 
-interface Renderable {
-    attributes: {[name: string]: VertexAttribute};
-    indexAttribute: IndexAttribute;
+interface RenderObject {
+    positions: VertexAttribute;
+    colors: VertexAttribute;
+    index: IndexAttribute;
 };
 
 class Renderer {
     camera: Camera;
     gl: WebGLRenderingContext;
     activeProgram: ShaderProgram;
-    loadedObjects: Array<Renderable>;
+    loadedObjects: Array<RenderObject>;
 
     constructor(context: WebGLRenderingContext) {
         this.loadedObjects = [];
@@ -165,45 +166,7 @@ class Renderer {
             16, 17, 18,     16, 18, 19,   // right
             20, 21, 22,     20, 22, 23,   // left
         ];
-
-        // vert buffer
-        let vertex_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        // color buffer
-        let color_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
-        // index buffer
-        let index_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
-        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-        this.loadedObjects.push({
-            attributes:{
-                vertex: {
-                    numComponents: 3,
-                    type: this.gl.FLOAT,
-                    normalize: false,
-                    stride: 0,
-                    offset: 0,
-                    buffer: vertex_buf
-                },
-                color: {
-                    numComponents: 4,
-                    type: this.gl.FLOAT,
-                    normalize: false,
-                    stride: 0,
-                    offset: 0,
-                    buffer: color_buf
-                }
-            },
-            indexAttribute: {
-                buffer: index_buf,
-                count: 36,
-                type: this.gl.UNSIGNED_SHORT,
-                offset: 0
-            }
-        });
+        this.loadObject(positions, colors, indices);
     }
 
     render() {
@@ -217,9 +180,10 @@ class Renderer {
 
         // render objects
         for(let i = 0; i < this.loadedObjects.length; ++i) {
-            // load verts
+            let obj = this.loadedObjects[i];
+            // load vert positions
             {
-                let attr = this.loadedObjects[i].attributes.vertex;
+                let attr = obj.positions;
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
                 this.gl.vertexAttribPointer(
                     this.activeProgram.attribLocations.vertexPosition,
@@ -232,7 +196,7 @@ class Renderer {
             }
             // load vert colors
             {
-                let attr = this.loadedObjects[i].attributes.color;
+                let attr = obj.colors;
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
                 this.gl.vertexAttribPointer(
                     this.activeProgram.attribLocations.vertexColor,
@@ -244,12 +208,12 @@ class Renderer {
                 this.gl.enableVertexAttribArray(this.activeProgram.attribLocations.vertexColor);
             }
             // load indices and draw
-            this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.loadedObjects[i].indexAttribute.buffer);
+            this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, obj.index.buffer);
             this.gl.useProgram(this.activeProgram.program);
             this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.projectionMatrix, false, projectionMatrix);
             this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.modelViewMatrix, false, modelViewMatrix);
             {
-                let attr = this.loadedObjects[i].indexAttribute;
+                let attr = obj.index;
                 this.gl.drawElements(
                     this.gl.TRIANGLES,
                     attr.count,
@@ -257,6 +221,45 @@ class Renderer {
                     attr.offset);
             }
         }
+    }
+
+    loadObject(positions: number[], colors: number[], indices: number[]) {
+        // vert buffer
+        let vertex_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        // color buffer
+        let color_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+        // index buffer
+        let index_buf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+        this.loadedObjects.push({
+            positions: {
+                numComponents: 3,
+                type: this.gl.FLOAT,
+                normalize: false,
+                stride: 0,
+                offset: 0,
+                buffer: vertex_buf
+            },
+            colors: {
+                numComponents: 4,
+                type: this.gl.FLOAT,
+                normalize: false,
+                stride: 0,
+                offset: 0,
+                buffer: color_buf
+            },
+            index: {
+                buffer: index_buf,
+                count: indices.length,
+                type: this.gl.UNSIGNED_SHORT,
+                offset: 0
+            }
+        });
     }
 
     loadShaderProgram(vertexShaderSource: string, fragmentShaderSource: string) : WebGLProgram | null {

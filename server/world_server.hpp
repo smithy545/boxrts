@@ -25,6 +25,7 @@ SOFTWARE.
 #ifndef SHAPEWAR_WORLD_SERVER_HPP
 #define SHAPEWAR_WORLD_SERVER_HPP
 
+#include <btBulletDynamicsCommon.h>
 #include <entt/entt.hpp>
 #include <map>
 #include <server/player.hpp>
@@ -42,6 +43,8 @@ public:
 
     world_server();
 
+    ~world_server() override;
+
     void on_open(connection_hdl hdl);
 
     void on_close(connection_hdl hdl);
@@ -56,6 +59,11 @@ private:
 
     server_base m_server;
     con_list m_connections;
+    btDiscreteDynamicsWorld* m_physics{nullptr};
+    btDispatcher* m_dispatcher{nullptr};
+    btBroadphaseInterface* m_pair_cache{nullptr};
+    btConstraintSolver* m_constraint_solver{nullptr};
+    btCollisionConfiguration* m_collision_configuration{nullptr};
 };
 
 } // namespace shapewar

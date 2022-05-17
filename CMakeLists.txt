@@ -19,10 +19,12 @@ external/json/include
 external/utils/include
 external/websocketpp
 /opt/homebrew/Cellar/boost/1.76.0/include
+/opt/homebrew/Cellar/bullet/3.17/include/bullet
 /opt/homebrew/opt/openssl/include)
 
 link_directories(
 /opt/homebrew/Cellar/boost/1.76.0/lib
+/opt/homebrew/Cellar/bullet/3.17/lib
 /opt/homebrew/opt/openssl/lib)
 
 link_libraries(
@@ -31,6 +33,9 @@ link_libraries(
 	utils
 	crypto
 	ssl
+	LinearMath
+	BulletCollision
+	BulletDynamics
 )
 add_executable(shapewar
 server/main.cpp

@@ -28,7 +28,6 @@ SOFTWARE.
 #include <unistd.h>
 #endif
 #include <chrono>
-#include <server/serialized_event.hpp>
 #include <server/world_server.hpp>
 
 
@@ -40,36 +39,48 @@ namespace shapewar {
 
 world_server::world_server() {
     m_server.init_asio();
-
     m_server.set_open_handler(bind(&world_server::on_open, this, ::_1));
     m_server.set_close_handler(bind(&world_server::on_close, this, ::_1));
     m_server.set_message_handler(bind(&world_server::on_message, this, ::_1, ::_2));
     m_server.set_fail_handler(bind(&world_server::on_fail, this, ::_1));
 
-    on<serialized_event>([](serialized_event& ev, world_server& emitter) {
-        switch(ev.code) {
-            default:
-                std::cout << "event code: " << ev.code << std::endl;
-                std::cout << "payload: " << ev.payload << std::endl;
-        }
-    });
+
+    m_collision_configuration = new btDefaultCollisionConfiguration();
+    m_dispatcher = new btCollisionDispatcher(m_collision_configuration);
+    m_pair_cache = new btDbvtBroadphase();
+    m_constraint_solver = new btSequentialImpulseConstraintSolver();
+    m_physics = new btDiscreteDynamicsWorld(
+        m_dispatcher,
+        m_pair_cache,
+        m_constraint_solver,
+        m_collision_configuration
+    );
+}
+
+world_server::~world_server() {
+    if(m_dispatcher != nullptr)
+        delete m_dispatcher;
+    if(m_pair_cache != nullptr)
+        delete m_pair_cache;
+    if(m_constraint_solver != nullptr)
+        delete m_constraint_solver;
+    if(m_collision_configuration != nullptr)
+        delete m_collision_configuration;
+    if(m_physics != nullptr)
+        delete m_physics;
 }
 
 void world_server::on_open(connection_hdl hdl) {
-    std::cout << "open " << &hdl << std::endl;
     m_connections.insert({hdl, player{}});
 }
 
 void world_server::on_close(connection_hdl hdl) {
-    std::cout << "close " << &hdl << std::endl;
     m_connections.erase(hdl);
 }
 
 void world_server::on_message(connection_hdl hdl, world_server::server_base::message_ptr msg) {
     if(m_connections.contains(hdl)) {
-        std::string payload = msg->get_payload();
-        std::uint16_t code = (payload[0] << 8) & payload[1];
-        publish<serialized_event>(code, payload.substr(2, payload.size() - 2));
+        std::cout << msg->get_payload() << std::endl;
         return;
     }
     std::cerr << "Message from unkown source" << std::endl;
@@ -97,6 +108,7 @@ void world_server::run(uint16_t port) {
 
         // do stuff
         sleep(1);
+        m_physics->stepSimulation(dt_ns);
 
         auto frame_end = std::chrono::high_resolution_clock::now();
         dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();

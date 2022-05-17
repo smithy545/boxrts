@@ -1,4 +1,9 @@
 {
     "http_port": 8080,
-    "socket_port": 9001
+    "socket_port": 9001,
+    "event_codes": {
+        "HI": {
+            "description": "Hi, hello, howdy."
+        }
+    }
 }
