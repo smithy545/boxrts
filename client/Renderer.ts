@@ -59,7 +59,7 @@ interface RenderObject {
 class Renderer {
     camera: Camera;
     gl: WebGLRenderingContext;
-    activeProgram: ShaderProgram;
+    activeShader: ShaderProgram;
     loadedObjects: Array<RenderObject>;
 
     constructor(context: WebGLRenderingContext) {
@@ -68,11 +68,12 @@ class Renderer {
         let program = this.loadShaderProgram(`
             attribute vec4 aVertexPosition;
             attribute vec4 aVertexColor;
-            uniform mat4 uModelViewMatrix;
+            uniform mat4 uModelMatrix;
+            uniform mat4 uViewMatrix;
             uniform mat4 uProjectionMatrix;
             varying lowp vec4 vColor;
             void main(void) {
-                gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+                gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
                 vColor = aVertexColor;
             }`,`
             varying lowp vec4 vColor;
@@ -84,7 +85,7 @@ class Renderer {
             console.error("Error loading initial program.");
             return;
         }
-        this.activeProgram = {
+        this.activeShader = {
             program: program,
             attribLocations: {
                 vertexPosition: this.gl.getAttribLocation(program, 'aVertexPosition'),
@@ -92,7 +93,8 @@ class Renderer {
             },
             uniformLocations: {
                 projectionMatrix: this.gl.getUniformLocation(program, 'uProjectionMatrix'),
-                modelViewMatrix: this.gl.getUniformLocation(program, 'uModelViewMatrix'),
+                viewMatrix: this.gl.getUniformLocation(program, 'uViewMatrix'),
+                modelMatrix: this.gl.getUniformLocation(program, 'uModelMatrix')
             }
         };
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
@@ -108,7 +110,7 @@ class Renderer {
 
     setupScene() {
         // cube verts/colors/indices
-        const positions = [
+        let positions = [
             // Front face
             -1.0, -1.0,  1.0,
              1.0, -1.0,  1.0,
@@ -158,7 +160,7 @@ class Renderer {
             const c = faceColors[i];
             colors = colors.concat(c,c,c,c);
         }
-        const indices = [
+        let indices = [
             0,  1,  2,      0,  2,  3,    // front
             4,  5,  6,      4,  6,  7,    // back
             8,  9,  10,     8,  10, 11,   // top
@@ -167,16 +169,36 @@ class Renderer {
             20, 21, 22,     20, 22, 23,   // left
         ];
         this.loadObject(positions, colors, indices);
+
+        // floor verts/colors/indices
+        positions = [
+            -10, 0, -10,
+            -10, 0, 10,
+            10, 0, -10,
+            10, 0, 10
+        ];
+        colors = [];
+        for(let i = 0; i < positions.length/3; ++i) {
+            colors = colors.concat(1,1,1,1);
+        }
+        indices = [0, 1, 2, 2, 3, 1];
+        this.loadObject(positions, colors, indices);
     }
 
     render() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         // setup mvp matrix
-        const modelViewMatrix = window.mat4.create();
+        const modelMatrix = window.mat4.create();
+        const viewMatrix = window.mat4.create();
         const projectionMatrix = window.mat4.create();
         window.mat4.perspective(projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
-        window.mat4.translate(modelViewMatrix, modelViewMatrix, [0,0,-6]);
+        window.mat4.lookAt(viewMatrix, [
+                20*Math.cos((new Date()).getTime()/10000),
+                20*Math.cos((new Date()).getTime()/1000),
+                20*Math.sin((new Date()).getTime()/10000)],
+            [0, 0, 0],
+            [0, 1, 0]);
 
         // render objects
         for(let i = 0; i < this.loadedObjects.length; ++i) {
@@ -186,32 +208,33 @@ class Renderer {
                 let attr = obj.positions;
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
                 this.gl.vertexAttribPointer(
-                    this.activeProgram.attribLocations.vertexPosition,
+                    this.activeShader.attribLocations.vertexPosition,
                     attr.numComponents,
                     attr.type,
                     attr.normalize,
                     attr.stride,
                     attr.offset);
-                this.gl.enableVertexAttribArray(this.activeProgram.attribLocations.vertexPosition);
+                this.gl.enableVertexAttribArray(this.activeShader.attribLocations.vertexPosition);
             }
             // load vert colors
             {
                 let attr = obj.colors;
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
                 this.gl.vertexAttribPointer(
-                    this.activeProgram.attribLocations.vertexColor,
+                    this.activeShader.attribLocations.vertexColor,
                     attr.numComponents,
                     attr.type,
                     attr.normalize,
                     attr.stride,
                     attr.offset);
-                this.gl.enableVertexAttribArray(this.activeProgram.attribLocations.vertexColor);
+                this.gl.enableVertexAttribArray(this.activeShader.attribLocations.vertexColor);
             }
             // load indices and draw
             this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, obj.index.buffer);
-            this.gl.useProgram(this.activeProgram.program);
-            this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.projectionMatrix, false, projectionMatrix);
-            this.gl.uniformMatrix4fv(this.activeProgram.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+            this.gl.useProgram(this.activeShader.program);
+            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.projectionMatrix, false, projectionMatrix);
+            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.viewMatrix, false, viewMatrix);
+            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.modelMatrix, false, modelMatrix);
             {
                 let attr = obj.index;
                 this.gl.drawElements(
@@ -224,15 +247,12 @@ class Renderer {
     }
 
     loadObject(positions: number[], colors: number[], indices: number[]) {
-        // vert buffer
         let vertex_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        // color buffer
         let color_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
-        // index buffer
         let index_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
