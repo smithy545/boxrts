@@ -34,46 +34,72 @@ interface ShaderProgram {
     uniformLocations: {[uniformName: string]: WebGLUniformLocation};
 }
 
-interface VertexAttribute {
-    buffer: WebGLBuffer;
-    numComponents: number;
-    type: GLenum;
-    normalize: boolean;
-    stride: number;
-    offset: number;
-};
-
 interface IndexAttribute {
-    buffer: WebGLBuffer;
     count: number;
     type: GLenum;
     offset: number;
 };
 
-interface RenderObject {
-    positions: VertexAttribute;
-    colors: VertexAttribute;
+interface InstanceList {
+    data?: Float32Array;
+    count: number;
+    buffer: WebGLBuffer;
+};
+
+class InstancedObject {
+    vao: WebGLVertexArrayObject;
     index: IndexAttribute;
+    instances: InstanceList;
+
+    constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer) {
+        this.vao = vao;
+        this.instances = {
+            buffer: matrixBuffer,
+            count: 0
+        };
+    }
+
+    addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) {
+        if(!instanceData)
+            instanceData = new Float32Array(window.mat4.create());
+        if(this.instances.data) {
+            this.instances.data = Float32Array.of(...this.instances.data, ...instanceData);
+        } else {
+            this.instances.data = instanceData;
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.instances.data, gl.STATIC_DRAW);
+        this.instances.count += 1;
+    }
+
+    modifyInstance(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
+        let offset = 4*4*instanceIndex;
+        this.instances.data.set(instanceData, offset);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT, instanceData);
+    }
+};
+
+interface RenderState {
+    shader: ShaderProgram;
+    loadedObjects: InstancedObject[];
 };
 
 class Renderer {
     camera: Camera;
-    gl: WebGLRenderingContext;
-    activeShader: ShaderProgram;
-    loadedObjects: Array<RenderObject>;
+    gl: WebGL2RenderingContext;
+    state: RenderState;
 
-    constructor(context: WebGLRenderingContext) {
-        this.loadedObjects = [];
+    constructor(context: WebGL2RenderingContext) {
         this.gl = context;
-        let program = this.loadShaderProgram(`
-            attribute vec4 aVertexPosition;
+        let program = this.loadShaderProgram(`attribute vec3 aVertexPosition;
             attribute vec4 aVertexColor;
-            uniform mat4 uModelMatrix;
+            attribute mat4 aInstanceMatrix;
             uniform mat4 uViewMatrix;
             uniform mat4 uProjectionMatrix;
             varying lowp vec4 vColor;
             void main(void) {
-                gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
+                gl_Position = uProjectionMatrix * uViewMatrix * aInstanceMatrix * vec4(aVertexPosition, 1);
                 vColor = aVertexColor;
             }`,`
             varying lowp vec4 vColor;
@@ -85,17 +111,20 @@ class Renderer {
             console.error("Error loading initial program.");
             return;
         }
-        this.activeShader = {
-            program: program,
-            attribLocations: {
-                vertexPosition: this.gl.getAttribLocation(program, 'aVertexPosition'),
-                vertexColor: this.gl.getAttribLocation(program, 'aVertexColor'),
+        this.state = {
+            shader: {
+                program: program,
+                attribLocations: {
+                    vertexPosition: this.gl.getAttribLocation(program, 'aVertexPosition'),
+                    vertexColor: this.gl.getAttribLocation(program, 'aVertexColor'),
+                    instanceMatrix: this.gl.getAttribLocation(program, 'aInstanceMatrix')
+                },
+                uniformLocations: {
+                    projectionMatrix: this.gl.getUniformLocation(program, 'uProjectionMatrix'),
+                    viewMatrix: this.gl.getUniformLocation(program, 'uViewMatrix'),
+                }
             },
-            uniformLocations: {
-                projectionMatrix: this.gl.getUniformLocation(program, 'uProjectionMatrix'),
-                viewMatrix: this.gl.getUniformLocation(program, 'uViewMatrix'),
-                modelMatrix: this.gl.getUniformLocation(program, 'uModelMatrix')
-            }
+            loadedObjects: []
         };
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
         this.gl.clearDepth(1.0); // clear depth buffer
@@ -109,177 +138,99 @@ class Renderer {
     }
 
     setupScene() {
-        // cube verts/colors/indices
-        let positions = [
-            // Front face
-            -1.0, -1.0,  1.0,
-             1.0, -1.0,  1.0,
-             1.0,  1.0,  1.0,
-            -1.0,  1.0,  1.0,
-        
-            // Back face
-            -1.0, -1.0, -1.0,
-            -1.0,  1.0, -1.0,
-             1.0,  1.0, -1.0,
-             1.0, -1.0, -1.0,
-        
-            // Top face
-            -1.0,  1.0, -1.0,
-            -1.0,  1.0,  1.0,
-             1.0,  1.0,  1.0,
-             1.0,  1.0, -1.0,
-        
-            // Bottom face
-            -1.0, -1.0, -1.0,
-             1.0, -1.0, -1.0,
-             1.0, -1.0,  1.0,
-            -1.0, -1.0,  1.0,
-        
-            // Right face
-             1.0, -1.0, -1.0,
-             1.0,  1.0, -1.0,
-             1.0,  1.0,  1.0,
-             1.0, -1.0,  1.0,
-        
-            // Left face
-            -1.0, -1.0, -1.0,
-            -1.0, -1.0,  1.0,
-            -1.0,  1.0,  1.0,
-            -1.0,  1.0, -1.0,
-        ];
-        const faceColors = [
-            [1.0,  1.0,  1.0,  1.0],    // Front face: white
-            [1.0,  0.0,  0.0,  1.0],    // Back face: red
-            [0.0,  1.0,  0.0,  1.0],    // Top face: green
-            [0.0,  0.0,  1.0,  1.0],    // Bottom face: blue
-            [1.0,  1.0,  0.0,  1.0],    // Right face: yellow
-            [1.0,  0.0,  1.0,  1.0],    // Left face: purple
-        ];
-        let colors: Array<number> = [];
-        for(let i = 0; i < faceColors.length; ++i) {
-            const c = faceColors[i];
-            colors = colors.concat(c,c,c,c);
-        }
-        let indices = [
-            0,  1,  2,      0,  2,  3,    // front
-            4,  5,  6,      4,  6,  7,    // back
-            8,  9,  10,     8,  10, 11,   // top
-            12, 13, 14,     12, 14, 15,   // bottom
-            16, 17, 18,     16, 18, 19,   // right
-            20, 21, 22,     20, 22, 23,   // left
-        ];
-        this.loadObject(positions, colors, indices);
-
         // floor verts/colors/indices
-        positions = [
+        const positions = [
             -10, 0, -10,
             -10, 0, 10,
             10, 0, -10,
             10, 0, 10
         ];
-        colors = [];
+        let colors: number[] = [];
         for(let i = 0; i < positions.length/3; ++i) {
             colors = colors.concat(1,1,1,1);
         }
-        indices = [0, 1, 2, 2, 3, 1];
-        this.loadObject(positions, colors, indices);
+        const indices = [0, 1, 2, 2, 3, 1];
+        let instanced_floor = this.loadObject(positions, colors, indices);
+        let model = window.mat4.create();
+        instanced_floor.addInstance(this.gl);
+        instanced_floor.modifyInstance(this.gl, 0, window.mat4.translate(model, model, [-15, 0, 0]));
+        instanced_floor.addInstance(this.gl);
+        instanced_floor.modifyInstance(this.gl, 1, window.mat4.translate(model, window.mat4.create(), [15, 0, 0]));
     }
 
     render() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         // setup mvp matrix
-        const modelMatrix = window.mat4.create();
         const viewMatrix = window.mat4.create();
         const projectionMatrix = window.mat4.create();
         window.mat4.perspective(projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
         window.mat4.lookAt(viewMatrix, [
                 20*Math.cos((new Date()).getTime()/10000),
-                20*Math.cos((new Date()).getTime()/1000),
+                20,
                 20*Math.sin((new Date()).getTime()/10000)],
             [0, 0, 0],
             [0, 1, 0]);
 
         // render objects
-        for(let i = 0; i < this.loadedObjects.length; ++i) {
-            let obj = this.loadedObjects[i];
-            // load vert positions
-            {
-                let attr = obj.positions;
-                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
-                this.gl.vertexAttribPointer(
-                    this.activeShader.attribLocations.vertexPosition,
-                    attr.numComponents,
-                    attr.type,
-                    attr.normalize,
-                    attr.stride,
-                    attr.offset);
-                this.gl.enableVertexAttribArray(this.activeShader.attribLocations.vertexPosition);
-            }
-            // load vert colors
-            {
-                let attr = obj.colors;
-                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, attr.buffer);
-                this.gl.vertexAttribPointer(
-                    this.activeShader.attribLocations.vertexColor,
-                    attr.numComponents,
-                    attr.type,
-                    attr.normalize,
-                    attr.stride,
-                    attr.offset);
-                this.gl.enableVertexAttribArray(this.activeShader.attribLocations.vertexColor);
-            }
-            // load indices and draw
-            this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, obj.index.buffer);
-            this.gl.useProgram(this.activeShader.program);
-            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.projectionMatrix, false, projectionMatrix);
-            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.viewMatrix, false, viewMatrix);
-            this.gl.uniformMatrix4fv(this.activeShader.uniformLocations.modelMatrix, false, modelMatrix);
-            {
-                let attr = obj.index;
-                this.gl.drawElements(
-                    this.gl.TRIANGLES,
-                    attr.count,
-                    attr.type,
-                    attr.offset);
-            }
+        this.gl.useProgram(this.state.shader.program);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, projectionMatrix);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, viewMatrix);
+        for(let key in this.state.loadedObjects) {
+            let index = this.state.loadedObjects[key].index;
+            this.gl.bindVertexArray(this.state.loadedObjects[key].vao);
+            this.gl.drawElementsInstanced(this.gl.TRIANGLES, index.count, index.type, index.offset, this.state.loadedObjects[key].instances.count);
         }
     }
 
-    loadObject(positions: number[], colors: number[], indices: number[]) {
+    loadObject(positions: number[], colors: number[], indices: number[]) : InstancedObject {
+        let vao = this.gl.createVertexArray();
+        this.gl.bindVertexArray(vao);
+
         let vertex_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
+
         let color_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexColor, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexColor);
+
+        let matrix_buf = this.gl.createBuffer();
+        let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrix_buf);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 3, 4, this.gl.FLOAT, false, 4*vec4Size, 3 * vec4Size);
+
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 1);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 2);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 3);
+
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 1, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 2, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 3, 1);
+
         let index_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-        this.loadedObjects.push({
-            positions: {
-                numComponents: 3,
-                type: this.gl.FLOAT,
-                normalize: false,
-                stride: 0,
-                offset: 0,
-                buffer: vertex_buf
-            },
-            colors: {
-                numComponents: 4,
-                type: this.gl.FLOAT,
-                normalize: false,
-                stride: 0,
-                offset: 0,
-                buffer: color_buf
-            },
-            index: {
-                buffer: index_buf,
-                count: indices.length,
-                type: this.gl.UNSIGNED_SHORT,
-                offset: 0
-            }
-        });
+
+        console.log(this.state);
+
+        let builtObject = new InstancedObject(vao, matrix_buf);
+        builtObject.index = {
+            count: indices.length,
+            type: this.gl.UNSIGNED_SHORT,
+            offset: 0
+        };
+        this.state.loadedObjects.push(builtObject);
+        return builtObject;
     }
 
     loadShaderProgram(vertexShaderSource: string, fragmentShaderSource: string) : WebGLProgram | null {

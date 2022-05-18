@@ -42,11 +42,29 @@ function loadJsonFile(path: string, callback: Function, error?: Function) {
     xhr.send();
 }
 
+function loadObjectFile(path: string, callback: Function, error?: Function) {
+    const xhr = new XMLHttpRequest();
+    xhr.overrideMimeType("application/obj");
+    xhr.onreadystatechange = () => {
+        if(xhr.readyState === 4 && xhr.status === 200) {
+            callback(xhr);
+        }
+    }
+    xhr.onerror = (e) => {
+        if(typeof error === undefined) {
+            console.error(`Could not load file from ${path}: ${e}`);
+        } else {
+            error(e);
+        }
+    }
+    xhr.open("GET", path, true);
+    xhr.send();
+}
+
 function loadImageFile(src: string, callback: Function) {
     const img = document.createElement('img');
     img.addEventListener('load', function() { callback(img); }, false);
     img.src = src;
 }
 
-
-export { loadJsonFile, loadImageFile };
+export { loadJsonFile, loadImageFile, loadObjectFile };

@@ -5,5 +5,7 @@
         "HI": {
             "description": "Hi, hello, howdy."
         }
-    }
+    },
+    "object_files": ["cube.obj"],
+    "image_files": ["butterfly.png"]
 }

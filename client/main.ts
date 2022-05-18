@@ -25,12 +25,12 @@ SOFTWARE.
 import { GameClient } from "./GameClient.js";
 import { WebSocketClient, WebSocketConfig } from "./WebSocketClient.js";
 import { Renderer } from "./Renderer.js";
-import { loadJsonFile } from "./ResourceLoaders.js";
+import { loadImageFile, loadJsonFile, loadObjectFile } from "./ResourceLoaders.js";
 
 
 function main() {
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
-    const gl = canvas.getContext("webgl") as WebGLRenderingContext;
+    const gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
     if(!gl) {
         alert("Unable to initialize WebGL. You browser may not support it.");
         return;
@@ -45,6 +45,30 @@ function main() {
         const conn: WebSocketClient = new WebSocketClient(config);
         const renderer = new Renderer(gl);
         const client: GameClient = new GameClient(renderer, conn);
+
+        // load object files
+        const objectFileStatus: {[filename: string]: boolean} = {};
+        for(let i = 0; i < constants["object_files"].length; i++) {
+            let path = constants["object_files"][i];
+            objectFileStatus[path] = false;
+            loadObjectFile(`./${path}`, (req: XMLHttpRequest) => {
+                objectFileStatus[path] = true;
+                console.log(req.response);
+                // TODO: Read object files to renderer
+            });
+        }
+        // load image files
+        const imageFileStatus: {[filename: string]: boolean} = {};
+        for(let i = 0; i < constants["image_files"].length; i++) {
+            let path = constants["image_files"][i];
+            imageFileStatus[path] = false;
+            loadImageFile(`./${path}`, (img: HTMLImageElement) => {
+                imageFileStatus[path] = true;
+                console.log(img);
+                // TODO: Read image files to texture
+            });
+        }
+
         const loop_body = () => {
             renderer.render();
             window.requestAnimationFrame(loop_body);
