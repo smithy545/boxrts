@@ -44,7 +44,6 @@ world_server::world_server() {
     m_server.set_message_handler(bind(&world_server::on_message, this, ::_1, ::_2));
     m_server.set_fail_handler(bind(&world_server::on_fail, this, ::_1));
 
-
     m_collision_configuration = new btDefaultCollisionConfiguration();
     m_dispatcher = new btCollisionDispatcher(m_collision_configuration);
     m_pair_cache = new btDbvtBroadphase();

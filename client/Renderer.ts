@@ -59,17 +59,17 @@ class InstancedObject {
         };
     }
 
-    addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) {
+    addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) : number {
         if(!instanceData)
             instanceData = new Float32Array(window.mat4.create());
-        if(this.instances.data) {
+        if(this.instances.data)
             this.instances.data = Float32Array.of(...this.instances.data, ...instanceData);
-        } else {
+        else
             this.instances.data = instanceData;
-        }
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.instances.data, gl.STATIC_DRAW);
         this.instances.count += 1;
+        return this.instances.count - 1;
     }
 
     modifyInstance(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
@@ -89,6 +89,9 @@ class Renderer {
     camera: Camera;
     gl: WebGL2RenderingContext;
     state: RenderState;
+    instancedFloor: InstancedObject;
+    viewMatrix: Float32Array;
+    projectionMatrix: Float32Array;
 
     constructor(context: WebGL2RenderingContext) {
         this.gl = context;
@@ -131,8 +134,12 @@ class Renderer {
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL); // near things obscure far things
 
-        // camera setup
-        this.camera = new Camera(this.gl.canvas.width, this.gl.canvas.height);
+        // setup camera and initial rendering matrices
+        this.camera = new Camera(0, 0, 0, this.gl.canvas.width, this.gl.canvas.height);
+        this.viewMatrix = window.mat4.create();
+        window.mat4.translate(this.viewMatrix, this.viewMatrix, this.camera.position);
+        this.projectionMatrix = window.mat4.create();
+        window.mat4.perspective(this.projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
 
         this.setupScene();
     }
@@ -145,45 +152,48 @@ class Renderer {
             10, 0, -10,
             10, 0, 10
         ];
-        let colors: number[] = [];
-        for(let i = 0; i < positions.length/3; ++i) {
-            colors = colors.concat(1,1,1,1);
-        }
+        const colors = [
+            1, 0, 0, 1,
+            0, 1, 0, 1,
+            0, 0, 1, 1,
+            1, 0, 1, 1
+        ];
         const indices = [0, 1, 2, 2, 3, 1];
-        let instanced_floor = this.loadObject(positions, colors, indices);
-        let model = window.mat4.create();
-        instanced_floor.addInstance(this.gl);
-        instanced_floor.modifyInstance(this.gl, 0, window.mat4.translate(model, model, [-15, 0, 0]));
-        instanced_floor.addInstance(this.gl);
-        instanced_floor.modifyInstance(this.gl, 1, window.mat4.translate(model, window.mat4.create(), [15, 0, 0]));
+        this.instancedFloor = this.createInstancedObject(positions, colors, indices);
+        this.instancedFloor.addInstance(this.gl);
+        this.instancedFloor.addInstance(this.gl);
     }
 
     render() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        // setup mvp matrix
-        const viewMatrix = window.mat4.create();
-        const projectionMatrix = window.mat4.create();
-        window.mat4.perspective(projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
-        window.mat4.lookAt(viewMatrix, [
-                20*Math.cos((new Date()).getTime()/10000),
+        // update view matrix
+        window.mat4.lookAt(this.viewMatrix, [
+                20,//*Math.cos((new Date()).getTime()/10000),
                 20,
-                20*Math.sin((new Date()).getTime()/10000)],
+                20],//*Math.sin((new Date()).getTime()/10000)],
             [0, 0, 0],
             [0, 1, 0]);
+        // update floor pos
+        let model = window.mat4.create();
+        window.mat4.rotate(model, model, ((new Date()).getTime()/1000), [0,1,0]);
+        this.instancedFloor.modifyInstance(this.gl, 0, model);
+        model = window.mat4.create();
+        window.mat4.translate(model, model, [0, Math.sin((new Date()).getTime()/1000), 0]);
+        this.instancedFloor.modifyInstance(this.gl, 1, window.mat4.translate(model, model, [20*Math.cos((new Date()).getTime()/1000), 0, 0]));
 
         // render objects
         this.gl.useProgram(this.state.shader.program);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, projectionMatrix);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, viewMatrix);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.viewMatrix);
         for(let key in this.state.loadedObjects) {
-            let index = this.state.loadedObjects[key].index;
-            this.gl.bindVertexArray(this.state.loadedObjects[key].vao);
-            this.gl.drawElementsInstanced(this.gl.TRIANGLES, index.count, index.type, index.offset, this.state.loadedObjects[key].instances.count);
+            let obj = this.state.loadedObjects[key];
+            this.gl.bindVertexArray(obj.vao);
+            this.gl.drawElementsInstanced(this.gl.TRIANGLES, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
         }
     }
 
-    loadObject(positions: number[], colors: number[], indices: number[]) : InstancedObject {
+    createInstancedObject(positions: number[], colors: number[], indices: number[]) : InstancedObject {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
@@ -201,7 +211,7 @@ class Renderer {
 
         let matrix_buf = this.gl.createBuffer();
         let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrix_buf);
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrix_buf); // don't initialize any instances yet
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
@@ -220,8 +230,6 @@ class Renderer {
         let index_buf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
-
-        console.log(this.state);
 
         let builtObject = new InstancedObject(vao, matrix_buf);
         builtObject.index = {

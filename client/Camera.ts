@@ -24,15 +24,17 @@ SOFTWARE.
 
 
 class Camera {
+    position: number[];
     fieldOfView: number; // in radians
     aspect: number;
     zNear: number;
     zFar: number;
-    constructor(width: number, height: number) {
+    constructor(x: number, y: number, z: number, width: number, height: number) {
         this.fieldOfView = 45 * Math.PI / 180;
         this.aspect = width / height;
         this.zNear = 0.1;
         this.zFar = 100.0;
+        this.position = [x, y, z];
     }
 };
 

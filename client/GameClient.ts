@@ -23,13 +23,52 @@ SOFTWARE.
 */
 
 import { Renderer } from "./Renderer.js";
-import { WebSocketClient } from "./WebSocketClient.js";
 
+
+interface WebSocketConfig {
+    address: string;
+    port?: number;
+};
 
 class GameClient {
-    constructor(renderer: Renderer, conn: WebSocketClient) {
-        conn.open();
+    config: WebSocketConfig;
+    connection: WebSocket;
+    renderer: Renderer;
+
+    constructor(config: WebSocketConfig, renderer: Renderer) {
+        this.config = config;
+        this.renderer = renderer;
+    }
+
+    open(callback?: Function) {
+        console.log("Opening socket connection to server...");
+        if(typeof this.config.port !== undefined)
+            this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
+        else
+            this.connection = new WebSocket(`ws://${this.config.address}`);
+        this.connection.addEventListener("open", (event: Event) => {
+            console.info("Connection opened...");
+            if(callback)
+                callback(event);
+        });
+        this.connection.addEventListener("error", (event: ErrorEvent) => {
+            console.error(event);
+        });
+        this.connection.addEventListener("message", (event: MessageEvent) => {
+            console.log(event);
+        });
+        this.connection.addEventListener("close", (event: CloseEvent) => {
+            if(event.wasClean)
+                console.info("Connection closed cleanly.");
+            else
+                console.error(`Connection died: ${event}`);
+        });
+    }
+
+    close() {
+        console.info("Closing socket connections.");
+        this.connection.close();
     }
 };
 
-export { GameClient };
+export { GameClient, WebSocketConfig };

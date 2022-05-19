@@ -22,8 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { GameClient } from "./GameClient.js";
-import { WebSocketClient, WebSocketConfig } from "./WebSocketClient.js";
+import { GameClient, WebSocketConfig } from "./GameClient.js";
 import { Renderer } from "./Renderer.js";
 import { loadImageFile, loadJsonFile, loadObjectFile } from "./ResourceLoaders.js";
 
@@ -32,7 +31,7 @@ function main() {
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
     const gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
     if(!gl) {
-        alert("Unable to initialize WebGL. You browser may not support it.");
+        alert("Unable to initialize WebGL2. You browser may not support it.");
         return;
     }
 
@@ -42,9 +41,8 @@ function main() {
             address: `${location.hostname}`,
             port: constants["socket_port"]
         };
-        const conn: WebSocketClient = new WebSocketClient(config);
         const renderer = new Renderer(gl);
-        const client: GameClient = new GameClient(renderer, conn);
+        const client: GameClient = new GameClient(config, renderer);
 
         // load object files
         const objectFileStatus: {[filename: string]: boolean} = {};
@@ -69,11 +67,15 @@ function main() {
             });
         }
 
-        const loop_body = () => {
-            renderer.render();
+        // open connection and start game loop on successful connect
+        client.open((ev: Event) => {
+            client.connection.send("HI");
+            const loop_body = () => {
+                renderer.render();
+                window.requestAnimationFrame(loop_body);
+            };
             window.requestAnimationFrame(loop_body);
-        };
-        window.requestAnimationFrame(loop_body);
+        });
     }, (e: any) => {
         console.error(`Error while loading constants: ${e}`);
     });
