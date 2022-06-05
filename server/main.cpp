@@ -31,7 +31,7 @@ SOFTWARE.
 
 
 using namespace nlohmann;
-using namespace shapewar;
+using namespace boxrts;
 
 int main() {
     std::cout << "Reading config..." << std::endl;

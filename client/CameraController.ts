@@ -48,12 +48,17 @@ class CameraController {
         }, false);
 
         canvas.onmousemove = (ev: MouseEvent) => {
+            if(!this.fullscreen)
+                return;
             this.camera.lookAtMouse(ev.movementX, ev.movementY, canvas);
         };
         canvas.onmousedown = (ev: MouseEvent) => {
-            canvas.requestFullscreen();
+            if(!this.fullscreen)
+                canvas.requestFullscreen();
         };
         document.onkeydown = (ev: KeyboardEvent) => {
+            if(!this.fullscreen)
+                return;
             switch(ev.key) {
                 case 'w':
                     this.camera.moveForward();
@@ -67,6 +72,12 @@ class CameraController {
                 case 'd':
                     this.camera.moveRight();
                     break;
+                case ' ':
+                    this.camera.moveUp();
+                    break;
+                default:
+                    if(ev.shiftKey && this.camera.position[1] >= 2)
+                        this.camera.moveUp(-1);
             }
         };
     }

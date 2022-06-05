@@ -22,17 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SHAPEWAR_PLAYER_HPP
-#define SHAPEWAR_PLAYER_HPP
+#ifndef BOXRTS_PLAYER_HPP
+#define BOXRTS_PLAYER_HPP
+
+#include <string>
 
 
+namespace boxrts {
 
-namespace shapewar {
-
-struct player {
-
+class player {
+public:
+    std::string get_frame_data();
 };
 
-} // namespace shapewar
+} // namespace boxrts
 
-#endif //SHAPEWAR_PLAYER_HPP
+#endif //BOXRTS_PLAYER_HPP

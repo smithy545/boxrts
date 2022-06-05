@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(shapewar C CXX)
+project(boxrts C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -19,12 +19,10 @@ external/json/include
 external/utils/include
 external/websocketpp
 /opt/homebrew/Cellar/boost/1.76.0/include
-/opt/homebrew/Cellar/bullet/3.17/include/bullet
 /opt/homebrew/opt/openssl/include)
 
 link_directories(
 /opt/homebrew/Cellar/boost/1.76.0/lib
-/opt/homebrew/Cellar/bullet/3.17/lib
 /opt/homebrew/opt/openssl/lib)
 
 link_libraries(
@@ -33,10 +31,8 @@ link_libraries(
 	utils
 	crypto
 	ssl
-	LinearMath
-	BulletCollision
-	BulletDynamics
 )
-add_executable(shapewar
+add_executable(boxrts
 server/main.cpp
+server/player.cpp
 server/world_server.cpp)

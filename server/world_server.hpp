@@ -22,10 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SHAPEWAR_WORLD_SERVER_HPP
-#define SHAPEWAR_WORLD_SERVER_HPP
+#ifndef BOXRTS_WORLD_SERVER_HPP
+#define BOXRTS_WORLD_SERVER_HPP
 
-#include <btBulletDynamicsCommon.h>
 #include <entt/entt.hpp>
 #include <map>
 #include <server/player.hpp>
@@ -35,7 +34,7 @@ SOFTWARE.
 
 using websocketpp::connection_hdl;
 
-namespace shapewar {
+namespace boxrts {
 
 class world_server : public entt::emitter<world_server> {
 public:
@@ -59,13 +58,8 @@ private:
 
     server_base m_server;
     con_list m_connections;
-    btDiscreteDynamicsWorld* m_physics{nullptr};
-    btDispatcher* m_dispatcher{nullptr};
-    btBroadphaseInterface* m_pair_cache{nullptr};
-    btConstraintSolver* m_constraint_solver{nullptr};
-    btCollisionConfiguration* m_collision_configuration{nullptr};
 };
 
-} // namespace shapewar
+} // namespace boxrts
 
-#endif //SHAPEWAR_WORLD_SERVER_HPP
+#endif //BOXRTS_WORLD_SERVER_HPP

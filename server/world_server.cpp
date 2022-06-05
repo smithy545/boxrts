@@ -35,7 +35,7 @@ using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
 using websocketpp::lib::bind;
 
-namespace shapewar {
+namespace boxrts {
 
 world_server::world_server() {
     m_server.init_asio();
@@ -43,31 +43,9 @@ world_server::world_server() {
     m_server.set_close_handler(bind(&world_server::on_close, this, ::_1));
     m_server.set_message_handler(bind(&world_server::on_message, this, ::_1, ::_2));
     m_server.set_fail_handler(bind(&world_server::on_fail, this, ::_1));
-
-    m_collision_configuration = new btDefaultCollisionConfiguration();
-    m_dispatcher = new btCollisionDispatcher(m_collision_configuration);
-    m_pair_cache = new btDbvtBroadphase();
-    m_constraint_solver = new btSequentialImpulseConstraintSolver();
-    m_physics = new btDiscreteDynamicsWorld(
-        m_dispatcher,
-        m_pair_cache,
-        m_constraint_solver,
-        m_collision_configuration
-    );
 }
 
-world_server::~world_server() {
-    if(m_dispatcher != nullptr)
-        delete m_dispatcher;
-    if(m_pair_cache != nullptr)
-        delete m_pair_cache;
-    if(m_constraint_solver != nullptr)
-        delete m_constraint_solver;
-    if(m_collision_configuration != nullptr)
-        delete m_collision_configuration;
-    if(m_physics != nullptr)
-        delete m_physics;
-}
+world_server::~world_server() {}
 
 void world_server::run(uint16_t port) {
     std::thread socket_server_thread([&]() {
@@ -87,12 +65,11 @@ void world_server::run(uint16_t port) {
 
         // do stuff
         sleep(1);
-        m_physics->stepSimulation(dt_ns);
 
         auto frame_end = std::chrono::high_resolution_clock::now();
         dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
         for(auto [hdl, player]: m_connections)
-            m_server.send(hdl, std::to_string(dt_ns), websocketpp::frame::opcode::TEXT);
+            m_server.send(hdl, player.get_frame_data(), websocketpp::frame::opcode::TEXT);
     }
 
     socket_server_thread.join();
@@ -118,4 +95,4 @@ void world_server::on_fail(connection_hdl hdl) {
     std::cerr << "Incoming connection failed" << std::endl;
 }
 
-} // namespace shapewar
+} // namespace boxrts
