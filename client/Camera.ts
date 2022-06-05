@@ -23,20 +23,24 @@ SOFTWARE.
 */
 
 
+declare var window: any;
+
 class Camera {
-    position: number[];
-    forward: number[];
-    up: number[];
+    position: Float32Array;
+    forward: Float32Array;
+    up: Float32Array;
     changed: boolean;
 
-    constructor(position: number[] = [0, 0, 0], forward: number[] = [1, 0, 0], up: number[] = [0, 1, 0]) {
+    constructor(position: Float32Array, forward: Float32Array, up: Float32Array) {
         this.position = position;
-        this.forward = forward;
-        this.up = up;
+        this.forward = window.vec3.create();
+        window.vec3.normalize(this.forward, forward);
+        this.up = window.vec3.create();
+        window.vec3.normalize(this.up, up);
         this.changed = true;
     }
 
-    lookAt(center: number[]) {
+    lookAt(center: Float32Array) {
         let inv_size = 0;
         for(let i = 0; i < this.forward.length; ++i) {
             this.forward[i] = center[i] - this.position[i];
@@ -48,17 +52,17 @@ class Camera {
         this.changed = true;
     }
 
-    lookTowards(direction: number[]) {
+    lookTowards(direction: Float32Array) {
         this.forward = direction;
         this.changed = true;
     }
 
-    setPosition(position: number[]) {
+    setPosition(position: Float32Array) {
         this.position = position;
         this.changed = true;
     }
 
-    move(translation: number[]) {
+    move(translation: Float32Array) {
         this.position[0] += translation[0];
         this.position[1] += translation[1];
         this.position[2] += translation[2];

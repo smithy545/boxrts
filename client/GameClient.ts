@@ -60,8 +60,10 @@ class GameClient {
         this.connection.addEventListener("close", (event: CloseEvent) => {
             if(event.wasClean)
                 console.info("Connection closed cleanly.");
-            else
-                console.error(`Connection died: ${event}`);
+            else {
+                console.error("Connection died:");
+                console.error(event);
+            }
         });
     }
 

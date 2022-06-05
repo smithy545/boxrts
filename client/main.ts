@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { CameraController } from "./CameraController.js";
 import { GameClient, WebSocketConfig } from "./GameClient.js";
 import { Renderer } from "./Renderer.js";
 import { loadImageFile, loadJsonFile, loadObjectFile } from "./ResourceLoaders.js";
@@ -38,12 +39,7 @@ function main() {
     loadJsonFile("./constants.json", (request: XMLHttpRequest) => {
         console.info("Bootstrap json loaded.");
         const constants = JSON.parse(request.responseText);
-        const config: WebSocketConfig = {
-            address: `${location.hostname}`,
-            port: constants["socket_port"]
-        };
         const renderer = new Renderer(gl);
-        const client: GameClient = new GameClient(config, renderer);
 
         // load object files
         const objectFileStatus: {[filename: string]: boolean} = {};
@@ -55,7 +51,7 @@ function main() {
                 objectFileStatus[path] = true;
                 console.info(`Object loaded at ${path}:`);
                 // debug: console.info(req.response);
-                // TODO: Read object files to renderer
+                // TODO: Load object files to renderer
             });
         }
         // load image files
@@ -67,13 +63,22 @@ function main() {
             loadImageFile(`./${path}`, (img: HTMLImageElement) => {
                 imageFileStatus[path] = true;
                 console.info(`Image loaded at ${path}`);
-                // TODO: Read image files to texture
+                // TODO: Load image files into textures
             });
         }
 
         // open connection and start game loop on successful connect
+        const config: WebSocketConfig = {
+            address: `${location.hostname}`,
+            port: constants["socket_port"]
+        };
+        const client: GameClient = new GameClient(config, renderer);
         client.open((ev: Event) => {
             client.connection.send("HI");
+            
+            // Load singletons
+            const controller: CameraController = new CameraController(renderer.camera, canvas);
+
             const loop_body = () => {
                 renderer.render();
                 window.requestAnimationFrame(loop_body);

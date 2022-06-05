@@ -135,8 +135,11 @@ class Renderer {
         this.gl.depthFunc(this.gl.LEQUAL); // near things obscure far things
 
         // setup camera and initial rendering matrices
-        this.camera = new Camera([10, 10, 0]);
-        this.camera.lookAt([0, 0, 0]);
+        this.camera = new Camera(
+            new Float32Array([0, 10, 0]),
+            new Float32Array([1, -1, 0]),
+            new Float32Array([0, 1, 0]));
+        //this.camera.lookAt(new Float32Array([10, 0, 10]));
         this.viewMatrix = window.mat4.create();
         window.mat4.translate(this.viewMatrix, this.viewMatrix, this.camera.position);
 
@@ -167,6 +170,15 @@ class Renderer {
         const indices = [0, 1, 2, 2, 3, 1];
         this.instancedFloor = this.createInstancedObject(positions, colors, indices);
         this.instancedFloor.addInstance(this.gl);
+    }
+
+    resize() {
+        let fieldOfView = 45 * Math.PI / 180;
+        let aspect = this.gl.canvas.width / this.gl.canvas.height;
+        let zNear = 0.1;
+        let zFar = 100.0;
+        this.projectionMatrix = window.mat4.create();
+        window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
     }
 
     render() {
