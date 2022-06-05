@@ -135,11 +135,17 @@ class Renderer {
         this.gl.depthFunc(this.gl.LEQUAL); // near things obscure far things
 
         // setup camera and initial rendering matrices
-        this.camera = new Camera(0, 0, 0, this.gl.canvas.width, this.gl.canvas.height);
+        this.camera = new Camera([10, 10, 0]);
+        this.camera.lookAt([0, 0, 0]);
         this.viewMatrix = window.mat4.create();
         window.mat4.translate(this.viewMatrix, this.viewMatrix, this.camera.position);
+
+        let fieldOfView = 45 * Math.PI / 180;
+        let aspect = this.gl.canvas.width / this.gl.canvas.height;
+        let zNear = 0.1;
+        let zFar = 100.0;
         this.projectionMatrix = window.mat4.create();
-        window.mat4.perspective(this.projectionMatrix, this.camera.fieldOfView, this.camera.aspect, this.camera.zNear, this.camera.zFar);
+        window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
         this.setupScene();
     }
@@ -161,26 +167,21 @@ class Renderer {
         const indices = [0, 1, 2, 2, 3, 1];
         this.instancedFloor = this.createInstancedObject(positions, colors, indices);
         this.instancedFloor.addInstance(this.gl);
-        this.instancedFloor.addInstance(this.gl);
     }
 
     render() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         // update view matrix
-        window.mat4.lookAt(this.viewMatrix, [
-                20,//*Math.cos((new Date()).getTime()/10000),
-                20,
-                20],//*Math.sin((new Date()).getTime()/10000)],
-            [0, 0, 0],
-            [0, 1, 0]);
-        // update floor pos
-        let model = window.mat4.create();
-        window.mat4.rotate(model, model, ((new Date()).getTime()/1000), [0,1,0]);
-        this.instancedFloor.modifyInstance(this.gl, 0, model);
-        model = window.mat4.create();
-        window.mat4.translate(model, model, [0, Math.sin((new Date()).getTime()/1000), 0]);
-        this.instancedFloor.modifyInstance(this.gl, 1, window.mat4.translate(model, model, [20*Math.cos((new Date()).getTime()/1000), 0, 0]));
+        if(this.camera.changed) {
+            window.mat4.translate(this.viewMatrix, window.mat4.create(), this.camera.position);    
+            window.mat4.lookAt(this.viewMatrix, this.camera.position, [
+                this.camera.position[0] + this.camera.forward[0],
+                this.camera.position[1] + this.camera.forward[1],
+                this.camera.position[2] + this.camera.forward[2]
+            ], this.camera.up);
+            this.camera.changed = false;
+        }
 
         // render objects
         this.gl.useProgram(this.state.shader.program);

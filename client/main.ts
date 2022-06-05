@@ -36,6 +36,7 @@ function main() {
     }
 
     loadJsonFile("./constants.json", (request: XMLHttpRequest) => {
+        console.info("Bootstrap json loaded.");
         const constants = JSON.parse(request.responseText);
         const config: WebSocketConfig = {
             address: `${location.hostname}`,
@@ -49,9 +50,11 @@ function main() {
         for(let i = 0; i < constants["object_files"].length; i++) {
             let path = constants["object_files"][i];
             objectFileStatus[path] = false;
+            console.info(`Requesting obj file: ${path}`)
             loadObjectFile(`./${path}`, (req: XMLHttpRequest) => {
                 objectFileStatus[path] = true;
-                console.log(req.response);
+                console.info(`Object loaded at ${path}:`);
+                // debug: console.info(req.response);
                 // TODO: Read object files to renderer
             });
         }
@@ -60,9 +63,10 @@ function main() {
         for(let i = 0; i < constants["image_files"].length; i++) {
             let path = constants["image_files"][i];
             imageFileStatus[path] = false;
+            console.info(`Requesting img file: ${path}`)
             loadImageFile(`./${path}`, (img: HTMLImageElement) => {
                 imageFileStatus[path] = true;
-                console.log(img);
+                console.info(`Image loaded at ${path}`);
                 // TODO: Read image files to texture
             });
         }

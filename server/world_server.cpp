@@ -69,26 +69,6 @@ world_server::~world_server() {
         delete m_physics;
 }
 
-void world_server::on_open(connection_hdl hdl) {
-    m_connections.insert({hdl, player{}});
-}
-
-void world_server::on_close(connection_hdl hdl) {
-    m_connections.erase(hdl);
-}
-
-void world_server::on_message(connection_hdl hdl, world_server::server_base::message_ptr msg) {
-    if(m_connections.contains(hdl)) {
-        std::cout << msg->get_payload() << std::endl;
-        return;
-    }
-    std::cerr << "Message from unkown source" << std::endl;
-}
-
-void world_server::on_fail(connection_hdl hdl) {
-    std::cerr << "Incoming connection failed" << std::endl;
-}
-
 void world_server::run(uint16_t port) {
     std::thread socket_server_thread([&]() {
         try {
@@ -116,6 +96,26 @@ void world_server::run(uint16_t port) {
     }
 
     socket_server_thread.join();
+}
+
+void world_server::on_open(connection_hdl hdl) {
+    m_connections.insert({hdl, player{}});
+}
+
+void world_server::on_close(connection_hdl hdl) {
+    m_connections.erase(hdl);
+}
+
+void world_server::on_message(connection_hdl hdl, world_server::server_base::message_ptr msg) {
+    if(m_connections.contains(hdl)) {
+        std::cout << msg->get_payload() << std::endl;
+        return;
+    }
+    std::cerr << "Message from unkown source" << std::endl;
+}
+
+void world_server::on_fail(connection_hdl hdl) {
+    std::cerr << "Incoming connection failed" << std::endl;
 }
 
 } // namespace shapewar

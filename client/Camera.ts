@@ -25,16 +25,48 @@ SOFTWARE.
 
 class Camera {
     position: number[];
-    fieldOfView: number; // in radians
-    aspect: number;
-    zNear: number;
-    zFar: number;
-    constructor(x: number, y: number, z: number, width: number, height: number) {
-        this.fieldOfView = 45 * Math.PI / 180;
-        this.aspect = width / height;
-        this.zNear = 0.1;
-        this.zFar = 100.0;
-        this.position = [x, y, z];
+    forward: number[];
+    up: number[];
+    changed: boolean;
+
+    constructor(position: number[] = [0, 0, 0], forward: number[] = [1, 0, 0], up: number[] = [0, 1, 0]) {
+        this.position = position;
+        this.forward = forward;
+        this.up = up;
+        this.changed = true;
+    }
+
+    lookAt(center: number[]) {
+        let inv_size = 0;
+        for(let i = 0; i < this.forward.length; ++i) {
+            this.forward[i] = center[i] - this.position[i];
+            inv_size += this.forward[i] * this.forward[i];
+        }
+        inv_size = 1.0 / Math.sqrt(inv_size);
+        for(let i = 0; i < this.forward.length; ++i)
+            this.forward[i] *= inv_size;
+        this.changed = true;
+    }
+
+    lookTowards(direction: number[]) {
+        this.forward = direction;
+        this.changed = true;
+    }
+
+    setPosition(position: number[]) {
+        this.position = position;
+        this.changed = true;
+    }
+
+    move(translation: number[]) {
+        this.position[0] += translation[0];
+        this.position[1] += translation[1];
+        this.position[2] += translation[2];
+        this.changed = true;
+    }
+
+    turn(radians: number) {
+        // TODO: Import vec3 glMatrix lib?
     }
 };
 
