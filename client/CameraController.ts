@@ -28,10 +28,12 @@ import { Camera } from "./Camera.js";
 class CameraController {
     camera: Camera;
     fullscreen: boolean;
+    keys: {[key: string]: boolean};
 
     constructor(camera: Camera, canvas: HTMLCanvasElement) {
         this.camera = camera;
         this.fullscreen = false;
+        this.keys = {};
 
         document.addEventListener("fullscreenchange", (ev) => {
             if(this.fullscreen) {
@@ -57,29 +59,34 @@ class CameraController {
                 canvas.requestFullscreen();
         };
         document.onkeydown = (ev: KeyboardEvent) => {
-            if(!this.fullscreen)
-                return;
-            switch(ev.key) {
-                case 'w':
-                    this.camera.moveFlat(1,0);
-                    break;
-                case 'a':
-                    this.camera.moveFlat(0,-1);
-                    break;
-                case 's':
-                    this.camera.moveFlat(-1,0);
-                    break;
-                case 'd':
-                    this.camera.moveFlat(0,1);
-                    break;
-                case ' ':
-                    this.camera.moveUp();
-                    break;
-                default:
-                    if(ev.shiftKey && this.camera.position[1] >= 2)
-                        this.camera.moveUp(-1);
-            }
+            if(ev.shiftKey)
+                this.keys['shift'] = true;
+            if(ev.ctrlKey)
+                this.keys['ctrl'] = true;
+            this.keys[ev.key] = true;
         };
+        document.onkeyup = (ev: KeyboardEvent) => {
+            if(!ev.shiftKey)
+                this.keys['shift'] = false;
+            if(!ev.ctrlKey)
+                this.keys['ctrl'] = false;
+            this.keys[ev.key] = false;
+        };
+    }
+
+    tick() {
+        if(this.keys['w'])
+            this.camera.moveFlat(1,0);
+        if(this.keys['a'])
+            this.camera.moveFlat(0,-1);
+        if(this.keys['s'])
+            this.camera.moveFlat(-1,0);
+        if(this.keys['d'])
+            this.camera.moveFlat(0,1);
+        if(this.keys[' '])
+            this.camera.moveUp();
+        if(this.keys['shift'] && this.camera.position[1] >= 2)
+            this.camera.moveUp(-1);
     }
 };
 

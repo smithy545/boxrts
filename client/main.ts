@@ -81,6 +81,7 @@ function main() {
 
             const loop_body = () => {
                 renderer.render();
+                controller.tick();
                 window.requestAnimationFrame(loop_body);
             };
             window.requestAnimationFrame(loop_body);

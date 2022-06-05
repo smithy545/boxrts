@@ -87,9 +87,9 @@ class Camera {
 
     moveFlat(dx: number, dz: number) {
         const forward = window.vec3.clone(this.forward);
-        const upProjection = window.vec3.dot(forward, this.up) / window.vec3.dot(this.up, this.up);
-        window.vec3.scaleAndAdd(forward, forward, this.up, -upProjection); // eliminate up/down component of forward vec
+        forward[1] = 0; // TODO: Stop using +y as de facto up vector
         const right = window.vec3.create();
+        right[1] = 0; // TODO: Stop using +y as de facto up vector
         window.vec3.cross(right, this.forward, this.up);
         window.vec3.scaleAndAdd(this.position, this.position, forward, dx);
         window.vec3.scaleAndAdd(this.position, this.position, right, dz);
