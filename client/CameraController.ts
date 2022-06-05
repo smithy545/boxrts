@@ -61,16 +61,16 @@ class CameraController {
                 return;
             switch(ev.key) {
                 case 'w':
-                    this.camera.moveForward();
+                    this.camera.moveFlat(1,0);
                     break;
                 case 'a':
-                    this.camera.moveRight(-1);
+                    this.camera.moveFlat(0,-1);
                     break;
                 case 's':
-                    this.camera.moveForward(-1);
+                    this.camera.moveFlat(-1,0);
                     break;
                 case 'd':
-                    this.camera.moveRight();
+                    this.camera.moveFlat(0,1);
                     break;
                 case ' ':
                     this.camera.moveUp();

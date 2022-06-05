@@ -85,6 +85,17 @@ class Camera {
         this.changed = true;
     }
 
+    moveFlat(dx: number, dz: number) {
+        const forward = window.vec3.clone(this.forward);
+        const upProjection = window.vec3.dot(forward, this.up) / window.vec3.dot(this.up, this.up);
+        window.vec3.scaleAndAdd(forward, forward, this.up, -upProjection); // eliminate up/down component of forward vec
+        const right = window.vec3.create();
+        window.vec3.cross(right, this.forward, this.up);
+        window.vec3.scaleAndAdd(this.position, this.position, forward, dx);
+        window.vec3.scaleAndAdd(this.position, this.position, right, dz);
+        this.changed = true;
+    }
+
     lookAtMouse(dx: number, dy: number, canvas: HTMLCanvasElement) {
         let view = window.mat4.create();
         window.mat4.rotate(view, view, -2 * Math.PI * dx / canvas.width, this.up);
