@@ -52,8 +52,8 @@ class Camera {
         this.changed = true;
     }
 
-    lookTowards(direction: Float32Array) {
-        this.forward = direction;
+    setForward(direction: Float32Array) {
+        window.vec3.normalize(this.forward, direction);
         this.changed = true;
     }
 
@@ -69,8 +69,15 @@ class Camera {
         this.changed = true;
     }
 
-    turn(radians: number) {
-        // TODO: Import vec3 glMatrix lib?
+    lookAtMouse(dx: number, dy: number, canvas: HTMLCanvasElement) {
+        let view = window.mat4.create();
+        window.mat4.rotate(view, view, -2 * Math.PI * dx / canvas.width, this.up);
+        let right = window.vec3.create();
+        window.vec3.cross(right, this.forward, this.up);
+        window.mat4.rotate(view, view, -2 * Math.PI * dy / canvas.height, right);
+        window.vec3.transformMat4(this.forward, this.forward, view);
+        window.vec3.normalize(this.forward, this.forward);
+        this.changed = true;
     }
 };
 

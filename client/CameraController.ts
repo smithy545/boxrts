@@ -25,8 +25,6 @@ SOFTWARE.
 import { Camera } from "./Camera.js";
 
 
-declare var window: any;
-
 class CameraController {
     camera: Camera;
     fullscreen: boolean;
@@ -45,17 +43,12 @@ class CameraController {
             }
             this.fullscreen = !this.fullscreen;
         }, false);
-        document.addEventListener('fullscreenerror', (ev) => {
+        document.addEventListener("fullscreenerror", (ev) => {
             console.error("Cannot change fullscreen status.");
         }, false);
 
         canvas.onmousemove = (ev: MouseEvent) => {
-            let dx = ev.movementX * 45 * Math.PI / (180 * canvas.height);
-            let point = window.vec3.create();
-            for(let i = 0; i < point.length; ++i)
-                point[i] += this.camera.position[i] + this.camera.forward[i];
-            window.vec3.rotateY(point, point, this.camera.position, dx);
-            this.camera.lookAt(point);
+            this.camera.lookAtMouse(ev.movementX, ev.movementY, canvas);
         };
         canvas.onmousedown = (ev: MouseEvent) => {
             canvas.requestFullscreen();
