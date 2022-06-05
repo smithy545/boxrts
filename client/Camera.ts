@@ -41,14 +41,14 @@ class Camera {
     }
 
     lookAt(center: Float32Array) {
-        let inv_size = 0;
+        let invSize = 0;
         for(let i = 0; i < this.forward.length; ++i) {
             this.forward[i] = center[i] - this.position[i];
-            inv_size += this.forward[i] * this.forward[i];
+            invSize += this.forward[i] * this.forward[i];
         }
-        inv_size = 1.0 / Math.sqrt(inv_size);
+        invSize = 1.0 / Math.sqrt(invSize);
         for(let i = 0; i < this.forward.length; ++i)
-            this.forward[i] *= inv_size;
+            this.forward[i] *= invSize;
         this.changed = true;
     }
 
@@ -72,12 +72,17 @@ class Camera {
     lookAtMouse(dx: number, dy: number, canvas: HTMLCanvasElement) {
         let view = window.mat4.create();
         window.mat4.rotate(view, view, -2 * Math.PI * dx / canvas.width, this.up);
-        let right = window.vec3.create();
-        window.vec3.cross(right, this.forward, this.up);
-        window.mat4.rotate(view, view, -2 * Math.PI * dy / canvas.height, right);
-        window.vec3.transformMat4(this.forward, this.forward, view);
-        window.vec3.normalize(this.forward, this.forward);
-        this.changed = true;
+        let temp = window.vec3.create(); // use as "right" directional vector
+        let forward = window.vec3.clone(this.forward);
+        window.vec3.cross(temp, forward, this.up);
+        window.mat4.rotate(view, view, -2 * Math.PI * dy / canvas.height, temp);
+        window.vec3.transformMat4(forward, forward, view);
+
+        // use temp to check forward x up collinearity 
+        window.vec3.cross(temp, forward, this.up);
+        const epsilon = 0.001;
+        if(window.vec3.length(temp) > epsilon)
+            this.setForward(forward);
     }
 };
 
