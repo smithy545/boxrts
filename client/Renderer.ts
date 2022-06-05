@@ -131,6 +131,7 @@ class Renderer {
         };
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
         this.gl.clearDepth(1.0); // clear depth buffer
+        this.gl.enable(this.gl.CULL_FACE);
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL); // near things obscure far things
 
@@ -167,7 +168,7 @@ class Renderer {
             0, 0, 1, 1,
             1, 0, 1, 1
         ];
-        const indices = [0, 1, 2, 2, 3, 1];
+        const indices = [0, 1, 2, 3, 2, 1];
         this.instancedFloor = this.createInstancedObject(positions, colors, indices);
         this.instancedFloor.addInstance(this.gl);
     }

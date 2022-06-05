@@ -62,10 +62,26 @@ class Camera {
         this.changed = true;
     }
 
-    move(translation: Float32Array) {
-        this.position[0] += translation[0];
-        this.position[1] += translation[1];
-        this.position[2] += translation[2];
+    moveForward(scale: number = 1) {
+        this.position[0] += scale * this.forward[0];
+        this.position[1] += scale * this.forward[1];
+        this.position[2] += scale * this.forward[2];
+        this.changed = true;
+    }
+
+    moveUp(scale: number = 1) {
+        this.position[0] += scale * this.up[0];
+        this.position[1] += scale * this.up[1];
+        this.position[2] += scale * this.up[2];
+        this.changed = true;
+    }
+
+    moveRight(scale: number = 1) {
+        const right = window.vec3.create();
+        window.vec3.cross(right, this.forward, this.up);
+        this.position[0] += scale * right[0];
+        this.position[1] += scale * right[1];
+        this.position[2] += scale * right[2];
         this.changed = true;
     }
 

@@ -52,7 +52,23 @@ class CameraController {
         };
         canvas.onmousedown = (ev: MouseEvent) => {
             canvas.requestFullscreen();
-        }
+        };
+        document.onkeydown = (ev: KeyboardEvent) => {
+            switch(ev.key) {
+                case 'w':
+                    this.camera.moveForward();
+                    break;
+                case 'a':
+                    this.camera.moveRight(-1);
+                    break;
+                case 's':
+                    this.camera.moveForward(-1);
+                    break;
+                case 'd':
+                    this.camera.moveRight();
+                    break;
+            }
+        };
     }
 };
 
