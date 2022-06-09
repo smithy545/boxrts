@@ -41,7 +41,7 @@ int main() {
     unsigned int socket_port = 9001;
     json event_codes;
     try {
-        std::ifstream constants_stream("./static/constants.json");
+        std::ifstream constants_stream("./static/bootstrap.json");
         json constants_json = nlohmann::json::parse(constants_stream);
         http_port = constants_json["http_port"];
         socket_port = constants_json["socket_port"];

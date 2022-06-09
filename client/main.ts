@@ -36,7 +36,7 @@ function main() {
         return;
     }
 
-    loadJsonFile("./constants.json", (request: XMLHttpRequest) => {
+    loadJsonFile("./bootstrap.json", (request: XMLHttpRequest) => {
         console.info("Bootstrap json loaded.");
         const constants = JSON.parse(request.responseText);
         const renderer = new Renderer(gl);
@@ -77,7 +77,7 @@ function main() {
             client.connection.send("HI");
             
             // Load singletons
-            const controller: CameraController = new CameraController(renderer.camera, canvas);
+            const controller = new CameraController(renderer.camera, canvas);
 
             const loop_body = () => {
                 renderer.render();
@@ -87,7 +87,8 @@ function main() {
             window.requestAnimationFrame(loop_body);
         });
     }, (e: any) => {
-        console.error(`Error while loading constants: ${e}`);
+        console.error("Error while loading constants:");
+        console.error(e);
     });
 }
 

@@ -22,11 +22,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <server/player.hpp>
 
+interface KeyInputController {
+    KeyUpCallback?: (ev: KeyboardEvent) => void;
+    keyDownCallback?: (ev: KeyboardEvent) => void;
+};
 
-namespace boxrts {
-    std::string player::get_frame_data() {
-        return "";
-    }
+interface KeyInputState {
+    getKey: (key: string) => boolean;
 }
+
+interface MouseInputController {
+    mouseMoveCallback?: (ev: MouseEvent) => void;
+    mouseDownCallback?: (ev: MouseEvent) => void;
+    mouseUpCallback?: (ev: MouseEvent) => void;
+    mouseEnterCallback?: (ev: MouseEvent) => void;
+    mouseLeaveCallback?: (ev: MouseEvent) => void;
+    mouseScrollCallback?: (ev: Event) => void;
+};
+
+interface FullscreenController {
+    fullscreen: boolean;
+    fullscreenChangeCallback?: (ev: Event) => void;
+    fullscreenErrorCallback?: (ev: Event) => void;
+};
+
+export { FullscreenController, KeyInputController, KeyInputState, MouseInputController };

@@ -22,20 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef BOXRTS_PLAYER_HPP
-#define BOXRTS_PLAYER_HPP
 
-#include <string>
+//Ref: https://www.typescriptlang.org/docs/handbook/mixins.html
 
+type Constructor = new (...args: any[]) => {};
 
-namespace boxrts {
+type GenericConstructor<T = {}> = new (...args: any[]) => T;
 
-struct player {
-    std::string get_frame_data() {
-        return "";
-    }
-};
-
-} // namespace boxrts
-
-#endif //BOXRTS_PLAYER_HPP
+export { Constructor, GenericConstructor };

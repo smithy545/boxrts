@@ -6,7 +6,7 @@
         "preserveConstEnums": true,
         "sourceMap": true,
         "outDir": "static",
-        "target": "es2015",
+        "target": "ES6",
         "baseUrl": "client",
         "esModuleInterop": true,
         "resolveJsonModule": true,

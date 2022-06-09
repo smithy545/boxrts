@@ -40,8 +40,8 @@ class GameClient {
         this.renderer = renderer;
     }
 
-    open(callback?: Function) {
-        console.log("Opening socket connection to server...");
+    open(callback?: (ev: Event) => void) {
+        console.info("Opening socket connection to server...");
         if(typeof this.config.port !== undefined)
             this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
         else

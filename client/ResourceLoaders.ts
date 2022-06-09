@@ -23,7 +23,7 @@ SOFTWARE.
 */
 
 
-function loadJsonFile(path: string, callback: Function, error?: Function) {
+function loadJsonFile(path: string, callback: (xhr: XMLHttpRequest) => void, error?: (ev: ProgressEvent<EventTarget>) => void) {
     const xhr = new XMLHttpRequest();
     xhr.overrideMimeType("application/json");
     xhr.onreadystatechange = () => {
@@ -31,18 +31,18 @@ function loadJsonFile(path: string, callback: Function, error?: Function) {
             callback(xhr);
         }
     }
-    xhr.onerror = (e) => {
+    xhr.onerror = (ev: ProgressEvent<EventTarget>) => {
         if(typeof error === undefined) {
-            console.error(`Could not load file from ${path}: ${e}`);
+            console.error(`Could not load file from ${path}: ${ev}`);
         } else {
-            error(e);
+            error(ev);
         }
     }
     xhr.open("GET", path, true);
     xhr.send();
 }
 
-function loadObjectFile(path: string, callback: Function, error?: Function) {
+function loadObjectFile(path: string, callback: (xhr: XMLHttpRequest) => void, error?: (ev: ProgressEvent<EventTarget>) => void) {
     const xhr = new XMLHttpRequest();
     xhr.overrideMimeType("application/obj");
     xhr.onreadystatechange = () => {
@@ -50,18 +50,18 @@ function loadObjectFile(path: string, callback: Function, error?: Function) {
             callback(xhr);
         }
     }
-    xhr.onerror = (e) => {
+    xhr.onerror = (ev: ProgressEvent<EventTarget>) => {
         if(typeof error === undefined) {
-            console.error(`Could not load file from ${path}: ${e}`);
+            console.error(`Could not load file from ${path}: ${ev}`);
         } else {
-            error(e);
+            error(ev);
         }
     }
     xhr.open("GET", path, true);
     xhr.send();
 }
 
-function loadImageFile(src: string, callback: Function) {
+function loadImageFile(src: string, callback: (img: HTMLImageElement) => void) {
     const img = document.createElement('img');
     img.addEventListener('load', function() { callback(img); }, false);
     img.src = src;

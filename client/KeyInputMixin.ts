@@ -22,20 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef BOXRTS_PLAYER_HPP
-#define BOXRTS_PLAYER_HPP
-
-#include <string>
+import { Constructor } from "mixins.js";
 
 
-namespace boxrts {
+function KeyInputMixin<TBase extends Constructor>(Base: TBase) {
+    return class KeyHandler extends Base {
+        _keys: {[key: string]: boolean} = {};
 
-struct player {
-    std::string get_frame_data() {
-        return "";
-    }
+        keyUpCallback(ev: KeyboardEvent) {
+            this._keys[ev.key] = false;
+            if(!ev.shiftKey)
+                this._keys['shift'] = false;
+            if(!ev.ctrlKey)
+                this._keys['ctrl'] = false;
+        }
+
+        keyDownCallback(ev: KeyboardEvent) {
+            this._keys[ev.key] = true;
+            if(ev.shiftKey)
+                this._keys['shift'] = true;
+            if(ev.ctrlKey)
+                this._keys['ctrl'] = true;
+        }
+
+        getKey(key: string) {
+            return this._keys[key];
+        }
+    };
 };
 
-} // namespace boxrts
-
-#endif //BOXRTS_PLAYER_HPP
+export { KeyInputMixin };

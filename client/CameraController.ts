@@ -23,71 +23,78 @@ SOFTWARE.
 */
 
 import { Camera } from "./Camera.js";
+import { FullscreenController, KeyInputController, KeyInputState, MouseInputController } from "./InputControllers.js";
+import { KeyInputMixin } from "./KeyInputMixin.js";
 
 
-class CameraController {
+class CameraControllerBase implements MouseInputController, KeyInputController, FullscreenController, KeyInputState {
     camera: Camera;
+    canvas: HTMLCanvasElement;
     fullscreen: boolean;
-    keys: {[key: string]: boolean};
+
+    // satisfy controller interface reqs, mixins will replace some funcs later
+    mouseUpCallback?: (ev: MouseEvent) => void;
+    mouseEnterCallback?: (ev: MouseEvent) => void;
+    mouseLeaveCallback?: (ev: MouseEvent) => void;
+    mouseScrollCallback?: (ev: Event) => void;
+    keyUpCallback?: (ev: KeyboardEvent) => void;
+    keyDownCallback?: (ev: KeyboardEvent) => void;
+    getKey: (key: string) => boolean;
 
     constructor(camera: Camera, canvas: HTMLCanvasElement) {
         this.camera = camera;
+        this.canvas = canvas;
         this.fullscreen = false;
-        this.keys = {};
+        document.addEventListener("fullscreenchange", this.fullscreenChangeCallback.bind(this), false);
+        document.addEventListener("fullscreenerror", this.fullscreenErrorCallback.bind(this), false);
+        canvas.addEventListener("mousemove", this.mouseMoveCallback.bind(this), false);
+        canvas.addEventListener("mousedown", this.mouseDownCallback.bind(this), false);
+        document.addEventListener("keydown", this.keyDownCallback.bind(this), false);
+        document.addEventListener("keyup", this.keyUpCallback.bind(this), false);
+    }
 
-        document.addEventListener("fullscreenchange", (ev) => {
-            if(this.fullscreen) {
-                console.log("Exiting fullscreen.");
-                document.exitPointerLock();
-            } else {
-                console.log("Entering fullscreen.");
-                canvas.requestPointerLock();
-            }
-            this.fullscreen = !this.fullscreen;
-        }, false);
-        document.addEventListener("fullscreenerror", (ev) => {
-            console.error("Cannot change fullscreen status.");
-        }, false);
+    fullscreenChangeCallback(ev: Event) {
+        if(this.fullscreen) {
+            console.info("Exiting fullscreen.");
+            document.exitPointerLock();
+        } else {
+            console.info("Entering fullscreen.");
+            this.canvas.requestPointerLock();
+        }
+        this.fullscreen = !this.fullscreen;
+    }
 
-        canvas.onmousemove = (ev: MouseEvent) => {
-            if(!this.fullscreen)
-                return;
-            this.camera.lookAtMouse(ev.movementX, ev.movementY, canvas);
-        };
-        canvas.onmousedown = (ev: MouseEvent) => {
-            if(!this.fullscreen)
-                canvas.requestFullscreen();
-        };
-        document.onkeydown = (ev: KeyboardEvent) => {
-            if(ev.shiftKey)
-                this.keys['shift'] = true;
-            if(ev.ctrlKey)
-                this.keys['ctrl'] = true;
-            this.keys[ev.key] = true;
-        };
-        document.onkeyup = (ev: KeyboardEvent) => {
-            if(!ev.shiftKey)
-                this.keys['shift'] = false;
-            if(!ev.ctrlKey)
-                this.keys['ctrl'] = false;
-            this.keys[ev.key] = false;
-        };
+    fullscreenErrorCallback(ev: Event) {
+        console.error("Cannot change fullscreen status.");
+    }
+
+    mouseMoveCallback(ev: MouseEvent) {
+        if(!this.fullscreen)
+            return;
+        this.camera.lookAtMouse(ev.movementX, ev.movementY, this.canvas);
+    }
+
+    mouseDownCallback(ev: MouseEvent) {
+        if(!this.fullscreen)
+            this.canvas.requestFullscreen();
     }
 
     tick() {
-        if(this.keys['w'])
+        if(this.getKey('w'))
             this.camera.moveFlat(1,0);
-        if(this.keys['a'])
+        if(this.getKey('a'))
             this.camera.moveFlat(0,-1);
-        if(this.keys['s'])
+        if(this.getKey('s'))
             this.camera.moveFlat(-1,0);
-        if(this.keys['d'])
+        if(this.getKey('d'))
             this.camera.moveFlat(0,1);
-        if(this.keys[' '])
+        if(this.getKey(' '))
             this.camera.moveUp();
-        if(this.keys['shift'] && this.camera.position[1] >= 2)
+        if(this.getKey('shift') && this.camera.position[1] >= 2)
             this.camera.moveUp(-1);
     }
 };
+
+const CameraController = KeyInputMixin(CameraControllerBase);
 
 export { CameraController };
