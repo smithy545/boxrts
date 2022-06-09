@@ -24,19 +24,22 @@ SOFTWARE.
 
 import { Camera } from "./Camera.js";
 import { FullscreenController, KeyInputController, KeyInputState, MouseInputController } from "./InputControllers.js";
-import { KeyInputMixin } from "./KeyInputMixin.js";
+import { KeyInputMixin } from "./mixins/KeyInputMixin.js";
 
 
-class CameraControllerBase implements MouseInputController, KeyInputController, FullscreenController, KeyInputState {
+class CameraControllerBase implements MouseInputController, KeyInputController, KeyInputState, FullscreenController {
     camera: Camera;
     canvas: HTMLCanvasElement;
+    focused: boolean;
     fullscreen: boolean;
 
-    // satisfy controller interface reqs, mixins will replace some funcs later
+    // satisfy controller interface reqs
     mouseUpCallback?: (ev: MouseEvent) => void;
+    mouseScrollCallback?: (ev: Event) => void;
     mouseEnterCallback?: (ev: MouseEvent) => void;
     mouseLeaveCallback?: (ev: MouseEvent) => void;
-    mouseScrollCallback?: (ev: Event) => void;
+
+    // defined by KeyInputMixin
     keyUpCallback?: (ev: KeyboardEvent) => void;
     keyDownCallback?: (ev: KeyboardEvent) => void;
     getKey: (key: string) => boolean;

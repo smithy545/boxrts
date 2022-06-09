@@ -22,33 +22,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { Constructor } from "mixins.js";
 
+interface Ticker {
+    tick: (timestamp?: DOMHighResTimeStamp) => void;
+}
 
-function KeyInputMixin<TBase extends Constructor>(Base: TBase) {
-    return class KeyHandler extends Base {
-        _keys: {[key: string]: boolean} = {};
+class MainLoop {
+    tickers: Set<Ticker> = new Set<Ticker>();
 
-        keyUpCallback(ev: KeyboardEvent) {
-            this._keys[ev.key] = false;
-            if(!ev.shiftKey)
-                this._keys['shift'] = false;
-            if(!ev.ctrlKey)
-                this._keys['ctrl'] = false;
-        }
+    tick(elapsedMs: DOMHighResTimeStamp) {
+        for(const ticker of this.tickers)
+            ticker.tick(elapsedMs);
+    }
 
-        keyDownCallback(ev: KeyboardEvent) {
-            this._keys[ev.key] = true;
-            if(ev.shiftKey)
-                this._keys['shift'] = true;
-            if(ev.ctrlKey)
-                this._keys['ctrl'] = true;
-        }
+    addTicker(ticker: Ticker) {
+        this.tickers.add(ticker);
+    }
 
-        getKey(key: string) {
-            return this._keys[key];
-        }
-    };
+    removeTicker(ticker: Ticker) {
+        this.tickers.delete(ticker);
+    }
 };
 
-export { KeyInputMixin };
+export { MainLoop };

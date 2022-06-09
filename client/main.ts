@@ -24,6 +24,7 @@ SOFTWARE.
 
 import { CameraController } from "./CameraController.js";
 import { GameClient, WebSocketConfig } from "./GameClient.js";
+import { MainLoop } from "./MainLoop.js";
 import { Renderer } from "./Renderer.js";
 import { loadImageFile, loadJsonFile, loadObjectFile } from "./ResourceLoaders.js";
 
@@ -63,7 +64,7 @@ function main() {
             loadImageFile(`./${path}`, (img: HTMLImageElement) => {
                 imageFileStatus[path] = true;
                 console.info(`Image loaded at ${path}`);
-                // TODO: Load image files into textures
+                // TODO: Load image files into opengl textures
             });
         }
 
@@ -75,20 +76,28 @@ function main() {
         const client: GameClient = new GameClient(config, renderer);
         client.open((ev: Event) => {
             client.connection.send("HI");
-            
+
             // Load singletons
             const controller = new CameraController(renderer.camera, canvas);
+            const mainLoop = new MainLoop();
+            mainLoop.addTicker(controller);
 
-            const loop_body = () => {
-                renderer.render();
-                controller.tick();
-                window.requestAnimationFrame(loop_body);
+            let previousTimestamp: DOMHighResTimeStamp = 0;
+            const tick = (timestamp: DOMHighResTimeStamp) => {
+                let elapsed = timestamp - previousTimestamp;
+
+                mainLoop.tick(elapsed);
+                renderer.render(elapsed);
+
+                previousTimestamp = timestamp;
+                window.requestAnimationFrame(tick);
             };
-            window.requestAnimationFrame(loop_body);
+            window.requestAnimationFrame(tick);
         });
     }, (e: any) => {
         console.error("Error while loading constants:");
         console.error(e);
+        alert("Error during initialization. Cannot start game.");
     });
 }
 

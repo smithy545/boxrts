@@ -182,7 +182,7 @@ class Renderer {
         window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
     }
 
-    render() {
+    render(elapsedMs: number) {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         // update view matrix
