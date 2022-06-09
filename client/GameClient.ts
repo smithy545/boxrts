@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { Renderer } from "./Renderer.js";
+import { MessageRouter } from "./MessageRouter.js";
 
 
 interface WebSocketConfig {
@@ -32,39 +32,53 @@ interface WebSocketConfig {
 
 class GameClient {
     config: WebSocketConfig;
-    connection: WebSocket;
-    renderer: Renderer;
+    connection: WebSocket | null;
+    router: MessageRouter;
 
-    constructor(config: WebSocketConfig, renderer: Renderer) {
+    constructor(config: WebSocketConfig) {
         this.config = config;
-        this.renderer = renderer;
+        this.connection = null;
+        this.router = new MessageRouter();
+    }
+
+    handleMessage(event: MessageEvent) {
+        let response = this.router.routeMessage(event);
+        if(response !== null)
+            this.connection.send(response);
+    }
+
+    handleError(event: ErrorEvent) {
+        let response = this.router.routeError(event);
+        if(response !== null)
+            this.connection.send(response);
+    }
+
+    isOpen() {
+        return this.connection !== null;
     }
 
     open(callback?: (ev: Event) => void) {
-        console.info("Opening socket connection to server...");
-        if(typeof this.config.port !== undefined)
-            this.connection = new WebSocket(`ws://${this.config.address}:${this.config.port}`);
-        else
-            this.connection = new WebSocket(`ws://${this.config.address}`);
+        console.info("Opening WebSocket connection...");
+        let urlString = `ws://${this.config.address}`;
+        if(this.config.port !== undefined)
+            urlString = `${urlString}:${this.config.port}`;
+        this.connection = new WebSocket(urlString);
         this.connection.addEventListener("open", (event: Event) => {
-            console.info("Connection opened...");
+            console.info("WebSocket opened.");
             if(callback)
                 callback(event);
         });
-        this.connection.addEventListener("error", (event: ErrorEvent) => {
-            console.error(event);
-        });
-        this.connection.addEventListener("message", (event: MessageEvent) => {
-            console.log(event);
-        });
         this.connection.addEventListener("close", (event: CloseEvent) => {
             if(event.wasClean)
-                console.info("Connection closed cleanly.");
+                console.info("WebSocket closed cleanly.");
             else {
-                console.error("Connection died:");
+                console.error("WebSocket closed unexpectedly:");
                 console.error(event);
             }
+            this.connection = null;
         });
+        this.connection.addEventListener("message", this.handleMessage.bind(this));
+        this.connection.addEventListener("error", this.handleError.bind(this));
     }
 
     close() {

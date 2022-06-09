@@ -211,21 +211,21 @@ class Renderer {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
-        let vertex_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buf);
+        let vertexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 3, this.gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
 
-        let color_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, color_buf);
+        let colorBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, colorBuf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexColor, 4, this.gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexColor);
 
-        let matrix_buf = this.gl.createBuffer();
+        let matrixBuf = this.gl.createBuffer();
         let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrix_buf); // don't initialize any instances yet
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrixBuf); // don't initialize any instances yet
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
@@ -241,11 +241,11 @@ class Renderer {
         this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 2, 1);
         this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 3, 1);
 
-        let index_buf = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index_buf);
+        let indexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
 
-        let builtObject = new InstancedObject(vao, matrix_buf);
+        let builtObject = new InstancedObject(vao, matrixBuf);
         builtObject.index = {
             count: indices.length,
             type: this.gl.UNSIGNED_SHORT,

@@ -73,7 +73,7 @@ function main() {
             address: `${location.hostname}`,
             port: constants["socket_port"]
         };
-        const client: GameClient = new GameClient(config, renderer);
+        const client: GameClient = new GameClient(config);
         client.open((ev: Event) => {
             client.connection.send("HI");
 
