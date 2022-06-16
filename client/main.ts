@@ -26,45 +26,69 @@ import { CameraController } from "./CameraController.js";
 import { GameClient, WebSocketConfig } from "./GameClient.js";
 import { MainLoop } from "./MainLoop.js";
 import { Renderer } from "./Renderer.js";
-import { loadImageFile, loadJsonFile, loadObjectFile } from "./ResourceLoaders.js";
+import { loadImageFile, loadFile } from "./ResourceLoaders.js";
 
 
 function main() {
+    const container = document.getElementById("gameDiv") as HTMLDivElement;
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
+    // set to screen size so scaling works properly even if canvas is smaller than full screen
+    canvas.width = window.screen.width;
+    canvas.height = window.screen.height;
     const gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
     if(!gl) {
         alert("Unable to initialize WebGL2. You browser may not support it.");
         return;
     }
+    const renderer = new Renderer(gl);
 
-    loadJsonFile("./bootstrap.json", (request: XMLHttpRequest) => {
+    // setup resize handling
+    window.addEventListener("resize", (ev: UIEvent) => {
+        renderer.resize();
+    });
+
+    // load bootstrap info
+    loadFile("./json/bootstrap.json", (request: XMLHttpRequest) => {
         console.info("Bootstrap json loaded.");
         const constants = JSON.parse(request.responseText);
-        const renderer = new Renderer(gl);
 
-        // load object files
+        // load object model files
         const objectFileStatus: {[filename: string]: boolean} = {};
         for(let i = 0; i < constants["object_files"].length; i++) {
-            let path = constants["object_files"][i];
+            const path: string = constants["object_files"][i];
             objectFileStatus[path] = false;
             console.info(`Requesting obj file: ${path}`)
-            loadObjectFile(`./${path}`, (req: XMLHttpRequest) => {
+            loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
                 objectFileStatus[path] = true;
                 console.info(`Object loaded at ${path}:`);
-                // debug: console.info(req.response);
-                // TODO: Load object files to renderer
-            });
+                renderer.parseAndLoadObj(req.responseText);
+            }, (ev) => {
+                console.error(ev);
+            }, "application/obj");
         }
-        // load image files
+
+        // load image files to textures
         const imageFileStatus: {[filename: string]: boolean} = {};
         for(let i = 0; i < constants["image_files"].length; i++) {
-            let path = constants["image_files"][i];
+            const path: string = constants["image_files"][i];
             imageFileStatus[path] = false;
             console.info(`Requesting img file: ${path}`)
-            loadImageFile(`./${path}`, (img: HTMLImageElement) => {
+            loadImageFile(`./images/${path}`, (img: HTMLImageElement) => {
                 imageFileStatus[path] = true;
                 console.info(`Image loaded at ${path}`);
-                // TODO: Load image files into opengl textures
+                const pathRegex = /(.*\/)*(.+)\.png/;
+                const matches = path.match(pathRegex);
+                if(matches !== null) {
+                    const location = matches[1];
+                    const name = matches[2];
+                    if(name.endsWith("tilesheet"))
+                        renderer.loadTilesheet(name, img);
+                    else if(name.endsWith("spritesheet"))
+                        renderer.loadSpritesheet(name, img);
+                    else
+                        renderer.loadTexture(name, img);
+                } else
+                    console.error("Image file type not supported");
             });
         }
 
@@ -75,12 +99,16 @@ function main() {
         };
         const client: GameClient = new GameClient(config);
         client.open((ev: Event) => {
-            client.connection.send("HI");
-
             // Load singletons
             const controller = new CameraController(renderer.camera, canvas);
             const mainLoop = new MainLoop();
             mainLoop.addTicker(controller);
+            client.router.registerCallback(1, (data: string) => {
+                let buf = new ArrayBuffer(1);
+                let view = new Int8Array(buf);
+                view[0] = 33; // send '!'
+                return buf;
+            });
 
             let previousTimestamp: DOMHighResTimeStamp = 0;
             const tick = (timestamp: DOMHighResTimeStamp) => {
@@ -92,13 +120,32 @@ function main() {
                 previousTimestamp = timestamp;
                 window.requestAnimationFrame(tick);
             };
-            window.requestAnimationFrame(tick);
+
+            console.info("Intitializing renderer...");
+            // load initial shader
+            renderer.loadShaderProgram("color", true);
+            const wait = (cond: () => boolean, success: () => void, interval: number) => {
+                setTimeout(()=>{
+                    console.info("...");
+                    if(cond())
+                        success();
+                    else
+                        wait(cond, success, interval);
+                }, interval);
+            };
+            wait(() => {
+                return renderer.ready;
+            }, () => {
+                console.info("Renderer initialized. Starting game loop.");
+                renderer.setupScene();
+                window.requestAnimationFrame(tick);
+            }, 1000);
         });
     }, (e: any) => {
         console.error("Error while loading constants:");
         console.error(e);
         alert("Error during initialization. Cannot start game.");
-    });
+    }, "application/json");
 }
 
 window.onload = main;

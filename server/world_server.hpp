@@ -27,22 +27,25 @@ SOFTWARE.
 
 #include <entt/entt.hpp>
 #include <map>
-#include <server/player.hpp>
+#include <set>
+#include <vector>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
 
+using entt::entity;
+using entt::registry;
 using websocketpp::connection_hdl;
 
 namespace boxrts {
 
-class world_server : public entt::emitter<world_server> {
+class WorldServer : public entt::emitter<WorldServer> {
 public:
     typedef websocketpp::server<websocketpp::config::asio> server_base;
 
-    world_server();
+    WorldServer();
 
-    ~world_server() override;
+    ~WorldServer() override;
 
     void on_open(connection_hdl hdl);
 
@@ -54,10 +57,11 @@ public:
 
     void run(uint16_t port);
 private:
-    typedef std::map<connection_hdl, player, std::owner_less<connection_hdl>> con_list;
+    typedef std::map<connection_hdl, entity, std::owner_less<connection_hdl>> con_entity_map;
 
+    registry m_registry;
     server_base m_server;
-    con_list m_connections;
+    con_entity_map m_connections;
 };
 
 } // namespace boxrts

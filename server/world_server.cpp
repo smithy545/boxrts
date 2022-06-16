@@ -22,12 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifdef _WIN32
-#include <Windows.h>
-#else
-#include <unistd.h>
-#endif
 #include <chrono>
+#include <server/player.hpp>
 #include <server/world_server.hpp>
 
 
@@ -37,17 +33,17 @@ using websocketpp::lib::bind;
 
 namespace boxrts {
 
-world_server::world_server() {
+WorldServer::WorldServer() {
     m_server.init_asio();
-    m_server.set_open_handler(bind(&world_server::on_open, this, ::_1));
-    m_server.set_close_handler(bind(&world_server::on_close, this, ::_1));
-    m_server.set_message_handler(bind(&world_server::on_message, this, ::_1, ::_2));
-    m_server.set_fail_handler(bind(&world_server::on_fail, this, ::_1));
+    m_server.set_open_handler(bind(&WorldServer::on_open, this, ::_1));
+    m_server.set_close_handler(bind(&WorldServer::on_close, this, ::_1));
+    m_server.set_message_handler(bind(&WorldServer::on_message, this, ::_1, ::_2));
+    m_server.set_fail_handler(bind(&WorldServer::on_fail, this, ::_1));
 }
 
-world_server::~world_server() {}
+WorldServer::~WorldServer() {}
 
-void world_server::run(uint16_t port) {
+void WorldServer::run(uint16_t port) {
     std::thread socket_server_thread([&]() {
         try {
             m_server.listen(port);
@@ -62,36 +58,39 @@ void world_server::run(uint16_t port) {
     unsigned long long dt_ns{0};
     for(;;) {
         auto frame_start = std::chrono::high_resolution_clock::now();
-
-        // do stuff
-        sleep(1);
-
+        sleep(5);
+        for(auto [hdl, entity]: m_connections) {
+            auto& player = m_registry.get<Player>(entity);
+            m_server.send(hdl, player.get_frame_data(), websocketpp::frame::opcode::TEXT);
+        }
         auto frame_end = std::chrono::high_resolution_clock::now();
         dt_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
-        for(auto [hdl, player]: m_connections)
-            m_server.send(hdl, player.get_frame_data(), websocketpp::frame::opcode::TEXT);
     }
 
     socket_server_thread.join();
 }
 
-void world_server::on_open(connection_hdl hdl) {
-    m_connections.insert({hdl, player{}});
+void WorldServer::on_open(connection_hdl hdl) {
+    auto entity = m_registry.create();
+    m_registry.emplace_or_replace<Player>(entity);
+    m_registry.emplace_or_replace<connection_hdl>(entity, hdl);
+    m_connections.insert({hdl, entity});
 }
 
-void world_server::on_close(connection_hdl hdl) {
+void WorldServer::on_close(connection_hdl hdl) {
+    auto entity = m_connections[hdl];
     m_connections.erase(hdl);
+    m_registry.destroy(entity);
 }
 
-void world_server::on_message(connection_hdl hdl, world_server::server_base::message_ptr msg) {
+void WorldServer::on_message(connection_hdl hdl, WorldServer::server_base::message_ptr msg) {
     if(m_connections.contains(hdl)) {
-        std::cout << msg->get_payload() << std::endl;
         return;
     }
-    std::cerr << "Message from unkown source" << std::endl;
+    std::cerr << "Message from unknown source" << std::endl;
 }
 
-void world_server::on_fail(connection_hdl hdl) {
+void WorldServer::on_fail(connection_hdl hdl) {
     std::cerr << "Incoming connection failed" << std::endl;
 }
 

@@ -26,18 +26,19 @@ SOFTWARE.
 declare var window: any;
 
 class Camera {
+    view: Float32Array;
     position: Float32Array;
     forward: Float32Array;
     up: Float32Array;
-    changed: boolean;
 
     constructor(position: Float32Array, forward: Float32Array, up: Float32Array) {
+        this.view = window.mat4.create();
         this.position = position;
         this.forward = window.vec3.create();
         window.vec3.normalize(this.forward, forward);
         this.up = window.vec3.create();
         window.vec3.normalize(this.up, up);
-        this.changed = true;
+        this.resetView();
     }
 
     lookAt(center: Float32Array) {
@@ -49,31 +50,31 @@ class Camera {
         invSize = 1.0 / Math.sqrt(invSize);
         for(let i = 0; i < this.forward.length; ++i)
             this.forward[i] *= invSize;
-        this.changed = true;
+        this.resetView();
     }
 
     setForward(direction: Float32Array) {
         window.vec3.normalize(this.forward, direction);
-        this.changed = true;
+        this.resetView();
     }
 
     setPosition(position: Float32Array) {
         this.position = position;
-        this.changed = true;
+        this.resetView();
     }
 
     moveForward(scale: number = 1) {
         this.position[0] += scale * this.forward[0];
         this.position[1] += scale * this.forward[1];
         this.position[2] += scale * this.forward[2];
-        this.changed = true;
+        this.resetView();
     }
 
     moveUp(scale: number = 1) {
         this.position[0] += scale * this.up[0];
         this.position[1] += scale * this.up[1];
         this.position[2] += scale * this.up[2];
-        this.changed = true;
+        this.resetView();
     }
 
     moveRight(scale: number = 1) {
@@ -82,7 +83,7 @@ class Camera {
         this.position[0] += scale * right[0];
         this.position[1] += scale * right[1];
         this.position[2] += scale * right[2];
-        this.changed = true;
+        this.resetView();
     }
 
     moveFlat(dx: number, dz: number) {
@@ -93,7 +94,9 @@ class Camera {
         window.vec3.cross(right, this.forward, this.up);
         window.vec3.scaleAndAdd(this.position, this.position, forward, dx);
         window.vec3.scaleAndAdd(this.position, this.position, right, dz);
-        this.changed = true;
+        this.resetView();
+        // TODO: Make generic moveAlongPlane method by subtracting projection of forward vector
+        // along surface normal and normalizing creating an "in-plane" forward vector
     }
 
     lookAtMouse(dx: number, dy: number, canvas: HTMLCanvasElement) {
@@ -110,6 +113,16 @@ class Camera {
         const epsilon = 0.001;
         if(window.vec3.length(temp) > epsilon)
             this.setForward(forward);
+        this.resetView();
+    }
+
+    resetView() {
+        window.mat4.translate(this.view, window.mat4.create(), this.position);    
+        window.mat4.lookAt(this.view, this.position, [
+            this.position[0] + this.forward[0],
+            this.position[1] + this.forward[1],
+            this.position[2] + this.forward[2]
+        ], this.up);
     }
 };
 

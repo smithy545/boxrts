@@ -41,7 +41,7 @@ int main() {
     unsigned int socket_port = 9001;
     json event_codes;
     try {
-        std::ifstream constants_stream("./static/bootstrap.json");
+        std::ifstream constants_stream("static/json/bootstrap.json");
         json constants_json = nlohmann::json::parse(constants_stream);
         http_port = constants_json["http_port"];
         socket_port = constants_json["socket_port"];
@@ -55,7 +55,7 @@ int main() {
     std::thread http_server_thread([http_port]() {
         try {
             httplib::Server http_server;
-            if(!http_server.set_mount_point("/", "./static"))
+            if(!http_server.set_mount_point("/", "static"))
                 std::cerr << "Error mounting static file directory. Make sure specified directory exists." << std::endl;
             else
                 http_server.listen("0.0.0.0", http_port);
@@ -65,7 +65,7 @@ int main() {
     });
 
     std::cout << "Starting world server on " << socket_port << std::endl;
-    world_server game_server;
+    WorldServer game_server;
     game_server.run(socket_port);
 
     http_server_thread.join();

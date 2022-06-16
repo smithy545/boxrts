@@ -25,6 +25,11 @@ SOFTWARE.
 import { Constructor } from "./mixins.js";
 
 
+
+interface KeyInputState {
+    getKey: (key: string) => boolean;
+}
+
 function KeyInputMixin<TBase extends Constructor>(Base: TBase, keyStore?: {[key: string]: boolean}) {
     return class extends Base {
         private _keys: {[key: string]: boolean} = keyStore === undefined ? {} : keyStore;
@@ -55,4 +60,4 @@ function KeyInputMixin<TBase extends Constructor>(Base: TBase, keyStore?: {[key:
     };
 };
 
-export { KeyInputMixin };
+export { KeyInputMixin, KeyInputState };

@@ -23,8 +23,8 @@ SOFTWARE.
 */
 
 import { Camera } from "./Camera.js";
-import { FullscreenController, KeyInputController, KeyInputState, MouseInputController } from "./InputControllers.js";
-import { KeyInputMixin } from "./mixins/KeyInputMixin.js";
+import { FullscreenController, KeyInputController, MouseInputController } from "./InputControllers.js";
+import { KeyInputMixin, KeyInputState } from "./mixins/KeyInputMixin.js";
 
 
 class CameraControllerBase implements MouseInputController, KeyInputController, KeyInputState, FullscreenController {
@@ -33,9 +33,8 @@ class CameraControllerBase implements MouseInputController, KeyInputController, 
     focused: boolean;
     fullscreen: boolean;
 
-    // satisfy controller interface reqs
+    // satisfy controller interface reqs, undefined atm
     mouseUpCallback?: (ev: MouseEvent) => void;
-    mouseScrollCallback?: (ev: Event) => void;
     mouseEnterCallback?: (ev: MouseEvent) => void;
     mouseLeaveCallback?: (ev: MouseEvent) => void;
 
@@ -52,6 +51,7 @@ class CameraControllerBase implements MouseInputController, KeyInputController, 
         document.addEventListener("fullscreenerror", this.fullscreenErrorCallback.bind(this), false);
         canvas.addEventListener("mousemove", this.mouseMoveCallback.bind(this), false);
         canvas.addEventListener("mousedown", this.mouseDownCallback.bind(this), false);
+        canvas.addEventListener("wheel", this.mouseWheelCallback.bind(this), false);
         document.addEventListener("keydown", this.keyDownCallback.bind(this), false);
         document.addEventListener("keyup", this.keyUpCallback.bind(this), false);
     }
@@ -69,6 +69,12 @@ class CameraControllerBase implements MouseInputController, KeyInputController, 
 
     fullscreenErrorCallback(ev: Event) {
         console.error("Cannot change fullscreen status.");
+    }
+
+    mouseWheelCallback(ev: WheelEvent) {
+        if(!this.fullscreen)
+            return;
+        this.camera.moveForward(-ev.deltaY/100.0);
     }
 
     mouseMoveCallback(ev: MouseEvent) {

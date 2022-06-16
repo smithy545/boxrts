@@ -23,12 +23,17 @@ SOFTWARE.
 */
 
 
-
 type OutgoingMessage = string | ArrayBuffer | Blob | ArrayBufferView;
 
 class MessageRouter {
-    routeMessage(event: MessageEvent): OutgoingMessage | null {
-        // TODO: unpack message and route via callbacks
+    private callbacks: {[eventType: number]: (data: string) => OutgoingMessage | null} = {};
+    encoder: TextEncoder = new TextEncoder();
+
+    routeMessage(event: MessageEvent<string>): OutgoingMessage | null {        
+        let type = event.data.charCodeAt(0);
+        if(type in this.callbacks)
+            return this.callbacks[type](event.data);
+        console.info(`No handler for message type ${type}`);
         return null;
     }
 
@@ -36,6 +41,10 @@ class MessageRouter {
         console.error("WebSocket error:");
         console.error(event);
         return null;
+    }
+
+    registerCallback(eventId: number, callback: (data: string) => OutgoingMessage | null) {
+        this.callbacks[eventId] = callback;
     }
 };
 

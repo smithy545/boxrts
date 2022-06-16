@@ -23,6 +23,7 @@ SOFTWARE.
 */
 
 import { Camera } from "./Camera.js";
+import { loadFile } from "./ResourceLoaders.js";
 
 
 declare var window: any;
@@ -80,9 +81,36 @@ class InstancedObject {
     }
 };
 
-interface RenderState {
-    shader: ShaderProgram;
+interface TilesheetInfo {
+    name: string;
+    tileWidth: number;
+    tileHeight: number;
+    margin: number;
+};
+
+interface SpritesheetInfo {
+    name: string;
+    spriteWidth: number;
+    spriteHeight: number;
+    margin: number;
+};
+
+class RenderState {
+    activeShader: string;
+    loadedShaders: {[name: string]: ShaderProgram};
     loadedObjects: InstancedObject[];
+
+    constructor() {
+        this.activeShader = "";
+        this.loadedShaders = {};
+        this.loadedObjects = [];
+    }
+
+    get shader(): ShaderProgram | null {
+        if(this.activeShader in this.loadedShaders)
+            return this.loadedShaders[this.activeShader];
+        return null;
+    }
 };
 
 class Renderer {
@@ -90,45 +118,12 @@ class Renderer {
     gl: WebGL2RenderingContext;
     state: RenderState;
     instancedFloor: InstancedObject;
-    viewMatrix: Float32Array;
     projectionMatrix: Float32Array;
 
     constructor(context: WebGL2RenderingContext) {
         this.gl = context;
-        let program = this.loadShaderProgram(`attribute vec3 aVertexPosition;
-            attribute vec4 aVertexColor;
-            attribute mat4 aInstanceMatrix;
-            uniform mat4 uViewMatrix;
-            uniform mat4 uProjectionMatrix;
-            varying lowp vec4 vColor;
-            void main(void) {
-                gl_Position = uProjectionMatrix * uViewMatrix * aInstanceMatrix * vec4(aVertexPosition, 1);
-                vColor = aVertexColor;
-            }`,`
-            varying lowp vec4 vColor;
-            void main(void) {
-                gl_FragColor = vColor;
-            }`
-        );
-        if(program === null) {
-            console.error("Error loading initial program.");
-            return;
-        }
-        this.state = {
-            shader: {
-                program: program,
-                attribLocations: {
-                    vertexPosition: this.gl.getAttribLocation(program, 'aVertexPosition'),
-                    vertexColor: this.gl.getAttribLocation(program, 'aVertexColor'),
-                    instanceMatrix: this.gl.getAttribLocation(program, 'aInstanceMatrix')
-                },
-                uniformLocations: {
-                    projectionMatrix: this.gl.getUniformLocation(program, 'uProjectionMatrix'),
-                    viewMatrix: this.gl.getUniformLocation(program, 'uViewMatrix'),
-                }
-            },
-            loadedObjects: []
-        };
+        this.state = new RenderState();
+
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
         this.gl.clearDepth(1.0); // clear depth buffer
         this.gl.enable(this.gl.CULL_FACE);
@@ -141,17 +136,87 @@ class Renderer {
             new Float32Array([1, -1, 0]),
             new Float32Array([0, 1, 0]));
         //this.camera.lookAt(new Float32Array([10, 0, 10]));
-        this.viewMatrix = window.mat4.create();
-        window.mat4.translate(this.viewMatrix, this.viewMatrix, this.camera.position);
+        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+        this.resize(); // setup persepctive matrix
+    }
 
-        let fieldOfView = 45 * Math.PI / 180;
-        let aspect = this.gl.canvas.width / this.gl.canvas.height;
-        let zNear = 0.1;
-        let zFar = 100.0;
-        this.projectionMatrix = window.mat4.create();
-        window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
+    get ready() {
+        return this.state.shader !== null;
+    }
 
-        this.setupScene();
+    parseAndLoadObj(data: string) {
+        let positions: number[] = [];
+        let colors: number[] = [];
+        let indices: number[] = [];
+
+        const lines = data.split(/\n/);
+        for(let i = 0; i < lines.length; i++) {
+            const tokens = lines[i].split(/\s/).filter((token: string) => {
+                return token.length > 0;
+            });
+            if(tokens.length === 0)
+                continue;
+            if(tokens[0] === 'v') { // vertex position
+                positions = positions.concat([
+                    parseInt(tokens[1]),
+                    parseInt(tokens[2]),
+                    parseInt(tokens[3])
+                ]);
+            } else if(tokens[0] === 'vt') { // vertex uv
+                // TODO: replace colors with uvs
+                colors = colors.concat([
+                    parseInt(tokens[1]),
+                    parseInt(tokens[2])
+                ]);
+            } else if(tokens[0] === 'vn') { // vertex normal
+                // TODO: do shit with normals
+            }
+        }
+        console.log(positions);
+        console.log(colors);
+        console.log(indices);
+    }
+
+    loadTilesheet(name: string, img: HTMLImageElement) {
+        // load accompanying text file to get tile size and margins
+        loadFile(`./json/${name}.json`, (xhr: XMLHttpRequest) => {
+            const info: TilesheetInfo = JSON.parse(xhr.responseText);
+            const versionMatch = name.match(/(@\d)/);
+        }, (ev) => {
+            console.error(ev);
+        }, "application/json");
+    }
+
+    loadSpritesheet(name: string, img: HTMLImageElement) {
+        // load accompanying text file to get sprite info
+        loadFile(`./json/${name}.json`, (xhr: XMLHttpRequest) => {
+            const info: SpritesheetInfo = JSON.parse(xhr.responseText);
+            const versionMatch = name.match(/(@\d)/);
+        }, (ev) => {
+            console.error(ev);
+        }, "application/json");
+    }
+
+    loadTexture(name: string, img: HTMLImageElement) {
+        const texture = this.readImgToTexture(img, this.gl.RGBA, this.gl.UNSIGNED_BYTE);
+    }
+
+    readImgToTexture(img: HTMLImageElement,
+        format: GLenum,
+        type: GLenum,
+        x: number = 0,
+        y: number = 0,
+        width: number = img.width,
+        height: number = img.height,
+        lod: number = 0) {
+        const texture: WebGLTexture = this.gl.createTexture();
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, lod, this.gl.RGBA, width, height, 0, format, type, img);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.REPEAT);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        return texture;
     }
 
     setupScene() {
@@ -184,22 +249,9 @@ class Renderer {
 
     render(elapsedMs: number) {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-
-        // update view matrix
-        if(this.camera.changed) {
-            window.mat4.translate(this.viewMatrix, window.mat4.create(), this.camera.position);    
-            window.mat4.lookAt(this.viewMatrix, this.camera.position, [
-                this.camera.position[0] + this.camera.forward[0],
-                this.camera.position[1] + this.camera.forward[1],
-                this.camera.position[2] + this.camera.forward[2]
-            ], this.camera.up);
-            this.camera.changed = false;
-        }
-
-        // render objects
         this.gl.useProgram(this.state.shader.program);
         this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.viewMatrix);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.view);
         for(let key in this.state.loadedObjects) {
             let obj = this.state.loadedObjects[key];
             this.gl.bindVertexArray(obj.vao);
@@ -255,7 +307,44 @@ class Renderer {
         return builtObject;
     }
 
-    loadShaderProgram(vertexShaderSource: string, fragmentShaderSource: string) : WebGLProgram | null {
+    loadShaderProgram(name: string, activateOnLoad: boolean = false) {
+        const infoFilePath = `shaders/${name}.json`;
+        const vertexFilePath = `shaders/${name}Vertex.glsl`;
+        const fragmentFilePath = `shaders/${name}Fragment.glsl`;
+        loadFile(infoFilePath, (xhr) => {
+            const shaderInfo = JSON.parse(xhr.responseText);
+            loadFile(fragmentFilePath, (xhr) => {
+                const fragShaderCode = xhr.responseText;
+                loadFile(vertexFilePath, (xhr) => {
+                    const vertexShaderCode = xhr.responseText;
+                    const program = this.loadShaderProgramFromSource(vertexShaderCode, fragShaderCode);
+                    if(program === null) {
+                        console.error("Error loading shader program.");
+                        return;
+                    }
+                    const shader: ShaderProgram = {
+                        program: program,
+                        attribLocations: {},
+                        uniformLocations: {}
+                    };
+                    const attributes: {[name: string]: string} = shaderInfo["attributes"];
+                    for(let key in attributes)
+                        shader.attribLocations[key] = this.gl.getAttribLocation(program, attributes[key]);
+                    const uniforms: {[name: string]: string} = shaderInfo["uniforms"];
+                    for(let key in uniforms)
+                        shader.uniformLocations[key] = this.gl.getUniformLocation(program, uniforms[key]);
+                    this.state.loadedShaders[name] = shader;
+                    if(activateOnLoad)
+                        this.state.activeShader = name;
+                    console.info(`Successfully loaded shader ${name}.`);
+                });
+            });
+        }, (err) => {
+            console.error(err);
+        }, "application/json");
+    }
+
+    loadShaderProgramFromSource(vertexShaderSource: string, fragmentShaderSource: string) : WebGLProgram | null {
         const vshader = this.loadShader(this.gl.VERTEX_SHADER, vertexShaderSource);
         const fshader = this.loadShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
         const program = this.gl.createProgram();

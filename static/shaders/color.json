@@ -1,0 +1,11 @@
+{
+    "uniforms": {
+        "projectionMatrix": "uProjectionMatrix",
+        "viewMatrix": "uViewMatrix"
+    },
+    "attributes": {
+        "vertexPosition": "aVertexPosition",
+        "vertexColor": "aVertexColor",
+        "instanceMatrix": "aInstanceMatrix"
+    }
+}

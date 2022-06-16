@@ -34,4 +34,5 @@ link_libraries(
 )
 add_executable(boxrts
 server/main.cpp
+server/player.cpp
 server/world_server.cpp)

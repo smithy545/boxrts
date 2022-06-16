@@ -28,17 +28,13 @@ interface KeyInputController {
     keyDownCallback?: (ev: KeyboardEvent) => void;
 };
 
-interface KeyInputState {
-    getKey: (key: string) => boolean;
-}
-
 interface MouseInputController {
     mouseMoveCallback?: (ev: MouseEvent) => void;
     mouseDownCallback?: (ev: MouseEvent) => void;
     mouseUpCallback?: (ev: MouseEvent) => void;
     mouseEnterCallback?: (ev: MouseEvent) => void;
     mouseLeaveCallback?: (ev: MouseEvent) => void;
-    mouseScrollCallback?: (ev: Event) => void;
+    mouseWheelCallback?: (ev: WheelEvent) => void;
 };
 
 interface FullscreenController {
@@ -47,4 +43,4 @@ interface FullscreenController {
     fullscreenErrorCallback?: (ev: Event) => void;
 };
 
-export { FullscreenController, KeyInputController, KeyInputState, MouseInputController };
+export { FullscreenController, KeyInputController, MouseInputController };

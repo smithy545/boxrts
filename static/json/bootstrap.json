@@ -1,0 +1,11 @@
+{
+    "http_port": 8080,
+    "socket_port": 9001,
+    "event_codes": {
+        "HI": {
+            "description": "Hi, hello, howdy."
+        }
+    },
+    "object_files": ["cube.obj"],
+    "image_files": ["medieval_tilesheet.png", "medieval_tilesheet@2.png", "scifi_tilesheet.png", "scifi_tilesheet@2.png"]
+}

@@ -30,10 +30,12 @@ SOFTWARE.
 
 namespace boxrts {
 
-struct player {
-    std::string get_frame_data() {
-        return "";
-    }
+class Player {
+public:
+    std::string get_frame_data();
+
+private:
+    std::string data{"\1"};
 };
 
 } // namespace boxrts

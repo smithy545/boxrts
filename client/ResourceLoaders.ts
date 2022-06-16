@@ -23,48 +23,31 @@ SOFTWARE.
 */
 
 
-function loadJsonFile(path: string, callback: (xhr: XMLHttpRequest) => void, error?: (ev: ProgressEvent<EventTarget>) => void) {
+function loadFile(
+    path: string,
+    callback: (xhr: XMLHttpRequest) => void,
+    error?: (ev: ProgressEvent<EventTarget>) => void,
+    mimeType: string = "text/plain") {
     const xhr = new XMLHttpRequest();
-    xhr.overrideMimeType("application/json");
+    xhr.overrideMimeType(mimeType);
     xhr.onreadystatechange = () => {
-        if(xhr.readyState === 4 && xhr.status === 200) {
+        if(xhr.readyState === 4 && xhr.status === 200)
             callback(xhr);
-        }
-    }
+    };
     xhr.onerror = (ev: ProgressEvent<EventTarget>) => {
-        if(typeof error === undefined) {
+        if(typeof error === undefined)
             console.error(`Could not load file from ${path}: ${ev}`);
-        } else {
+        else
             error(ev);
-        }
-    }
+    };
     xhr.open("GET", path, true);
     xhr.send();
-}
-
-function loadObjectFile(path: string, callback: (xhr: XMLHttpRequest) => void, error?: (ev: ProgressEvent<EventTarget>) => void) {
-    const xhr = new XMLHttpRequest();
-    xhr.overrideMimeType("application/obj");
-    xhr.onreadystatechange = () => {
-        if(xhr.readyState === 4 && xhr.status === 200) {
-            callback(xhr);
-        }
-    }
-    xhr.onerror = (ev: ProgressEvent<EventTarget>) => {
-        if(typeof error === undefined) {
-            console.error(`Could not load file from ${path}: ${ev}`);
-        } else {
-            error(ev);
-        }
-    }
-    xhr.open("GET", path, true);
-    xhr.send();
-}
+};
 
 function loadImageFile(src: string, callback: (img: HTMLImageElement) => void) {
     const img = document.createElement('img');
     img.addEventListener('load', function() { callback(img); }, false);
     img.src = src;
-}
+};
 
-export { loadJsonFile, loadImageFile, loadObjectFile };
+export { loadFile, loadImageFile };
