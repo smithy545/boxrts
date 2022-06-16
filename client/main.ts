@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { Scene } from "./Scene.js";
 import { CameraController } from "./CameraController.js";
 import { GameClient, WebSocketConfig } from "./GameClient.js";
 import { MainLoop } from "./MainLoop.js";
@@ -53,24 +54,26 @@ function main() {
         const constants = JSON.parse(request.responseText);
 
         // load object model files
+        const objectFiles = constants["objects"];
         const objectFileStatus: {[filename: string]: boolean} = {};
-        for(let i = 0; i < constants["object_files"].length; i++) {
-            const path: string = constants["object_files"][i];
+        for(let i = 0; i < objectFiles.length; i++) {
+            const path: string = objectFiles[i];
             objectFileStatus[path] = false;
             console.info(`Requesting obj file: ${path}`)
             loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
                 objectFileStatus[path] = true;
                 console.info(`Object loaded at ${path}:`);
-                renderer.parseAndLoadObj(req.responseText);
+                renderer.loadObject(req.responseText);
             }, (ev) => {
                 console.error(ev);
             }, "application/obj");
         }
 
         // load image files to textures
+        const imageFiles = constants["images"];
         const imageFileStatus: {[filename: string]: boolean} = {};
-        for(let i = 0; i < constants["image_files"].length; i++) {
-            const path: string = constants["image_files"][i];
+        for(let i = 0; i < imageFiles.length; i++) {
+            const path: string = imageFiles[i];
             imageFileStatus[path] = false;
             console.info(`Requesting img file: ${path}`)
             loadImageFile(`./images/${path}`, (img: HTMLImageElement) => {
@@ -86,7 +89,7 @@ function main() {
                     else if(name.endsWith("spritesheet"))
                         renderer.loadSpritesheet(name, img);
                     else
-                        renderer.loadTexture(name, img);
+                        renderer.loadImage(name, img);
                 } else
                     console.error("Image file type not supported");
             });
@@ -102,6 +105,8 @@ function main() {
             // Load singletons
             const controller = new CameraController(renderer.camera, canvas);
             const mainLoop = new MainLoop();
+            const scene = new Scene();
+
             mainLoop.addTicker(controller);
             client.router.registerCallback(1, (data: string) => {
                 let buf = new ArrayBuffer(1);
@@ -122,8 +127,11 @@ function main() {
             };
 
             console.info("Intitializing renderer...");
-            // load initial shader
-            renderer.loadShaderProgram("color", true);
+            const shaders = constants["shaders"];
+            for(let i = 0; i < shaders.length; i++) {
+                renderer.loadShaderProgram(shaders[i]);
+            }
+
             const wait = (cond: () => boolean, success: () => void, interval: number) => {
                 setTimeout(()=>{
                     console.info("...");
@@ -134,10 +142,11 @@ function main() {
                 }, interval);
             };
             wait(() => {
+                renderer.setActiveShaderProgram("texture");
                 return renderer.ready;
             }, () => {
                 console.info("Renderer initialized. Starting game loop.");
-                renderer.setupScene();
+                scene.setup(renderer);
                 window.requestAnimationFrame(tick);
             }, 1000);
         });

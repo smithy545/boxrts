@@ -1,0 +1,12 @@
+{
+    "uniforms": {
+        "projectionMatrix": "uProjectionMatrix",
+        "viewMatrix": "uViewMatrix",
+        "sampler": "uSampler"
+    },
+    "attributes": {
+        "vertexPosition": "aVertexPosition",
+        "textureCoord": "aTextureCoord",
+        "instanceMatrix": "aInstanceMatrix"
+    }
+}

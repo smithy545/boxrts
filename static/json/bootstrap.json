@@ -6,6 +6,12 @@
             "description": "Hi, hello, howdy."
         }
     },
-    "object_files": ["cube.obj"],
-    "image_files": ["medieval_tilesheet.png", "medieval_tilesheet@2.png", "scifi_tilesheet.png", "scifi_tilesheet@2.png"]
+    "shaders": ["color", "texture"],
+    "objects": ["cube.obj"],
+    "images": [
+        "medievalTile_58.png",
+        "medieval_tilesheet.png",
+        "medieval_tilesheet@2.png",
+        "scifi_tilesheet.png",
+        "scifi_tilesheet@2.png"]
 }
