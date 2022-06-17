@@ -30,6 +30,15 @@ import { Renderer } from "./render/Renderer.js";
 import { loadImageFile, loadFile } from "./ResourceLoaders.js";
 
 
+function wait (cond: () => boolean, success: () => void, interval: number) {
+    setTimeout(()=>{
+        if(cond())
+            success();
+        else
+            wait(cond, success, interval);
+    }, interval);
+}
+
 function main() {
     const container = document.getElementById("gameDiv") as HTMLDivElement;
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
@@ -45,6 +54,8 @@ function main() {
 
     // setup resize handling
     window.addEventListener("resize", (ev: UIEvent) => {
+        container.style.width = `${innerWidth}px`;
+        container.style.height = `${innerHeight}px`;
         renderer.resize();
     });
 
@@ -99,59 +110,62 @@ function main() {
                 return buf;
             });
 
-            let previousTimestamp: DOMHighResTimeStamp = 0;
-            const tick = (timestamp: DOMHighResTimeStamp) => {
-                let elapsed = timestamp - previousTimestamp;
-
-                mainLoop.tick(elapsed);
-                renderer.render(elapsed);
-
-                previousTimestamp = timestamp;
-                window.requestAnimationFrame(tick);
-            };
-
-            console.info("Intitializing renderer...");
+            console.info("Intitializing shaders...");
             const shaders = constants["shaders"];
             for(let i = 0; i < shaders.length; ++i) {
                 renderer.loadShaderProgram(shaders[i]);
             }
-
-            const wait = (cond: () => boolean, success: () => void, interval: number) => {
-                setTimeout(()=>{
-                    console.info("...");
-                    if(cond())
-                        success();
-                    else
-                        wait(cond, success, interval);
-                }, interval);
-            };
             wait(() => {
                 renderer.setActiveShaderProgram("texture");
                 return renderer.ready;
             }, () => {
-                console.info("Renderer initialized.");
-
                 // load object model files
                 const objectFiles = constants["objects"];
                 const objectFileStatus: {[filename: string]: boolean} = {};
                 for(let i = 0; i < objectFiles.length; ++i) {
                     const path: string = objectFiles[i];
-                    objectFileStatus[path] = false;
-                    console.info(`Requesting obj file: ${path}`)
-                    loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
-                        objectFileStatus[path] = true;
-                        console.info(`Object loaded at ${path}:`);
-                        renderer.loadMeshObject(req.responseText);
-                    }, (ev) => {
-                        console.error(ev);
-                    }, "application/obj");
+                    const pathRegex = /(.*\/)*(.+)\.obj/;
+                    const matches = path.match(pathRegex);
+                    if(matches === null) {
+                        console.error("Object filename must end in \".obj\". Sorry, I don't make the rules. I'm just an automated prompt :/");
+                    } else {
+                        const location = matches[1];
+                        const name = matches[2];
+                        objectFileStatus[path] = false;
+                        console.info(`Requesting obj file: ${path}`)
+                        loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
+                            objectFileStatus[path] = true;
+                            console.info(`Object loaded at ${path}:`);
+                            console.info(renderer.loadMeshObject(req.responseText, name));
+                        }, (ev) => {
+                            console.error(ev);
+                        }, "application/obj");
+                    }
                 }
+                wait(() => {
+                    for(let key in objectFileStatus) {
+                        if(objectFileStatus[key] !== true)
+                            return false;
+                    }
+                    return true;
+                }, () => {
+                    console.info("Loading initial scene...");
+                    scene.setup(renderer);
 
-                scene.setup(renderer);
-
-                console.info("Starting game loop.");
-                window.requestAnimationFrame(tick);
-            }, 1000);
+                    console.info("Starting game loop.");
+                    let previousTimestamp: DOMHighResTimeStamp = 0;
+                    const tick = (timestamp: DOMHighResTimeStamp) => {
+                        let elapsed = timestamp - previousTimestamp;
+        
+                        mainLoop.tick(elapsed);
+                        renderer.render(elapsed);
+        
+                        previousTimestamp = timestamp;
+                        window.requestAnimationFrame(tick);
+                    };
+                    window.requestAnimationFrame(tick);
+                }, 1000)
+            }, 500);
         });
     }, (e: any) => {
         console.error("Error while loading constants:");

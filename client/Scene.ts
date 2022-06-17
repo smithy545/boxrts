@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { MeshController } from "./render/MeshController.js";
 import { InstancedObject } from "./render/InstancedObject.js";
 import { Renderer } from "./render/Renderer.js";
 
@@ -30,6 +31,7 @@ declare var window: any;
 
 class Scene {
     instancedFloor: InstancedObject;
+    playerController: MeshController;
 
     constructor() {}
 
@@ -68,8 +70,13 @@ class Scene {
         this.instancedFloor = renderer.createTexturedTriangleMesh(positions, uvs, normals, indices);
         this.instancedFloor.addTexture("medieval_tilesheet");
 
+        const playerMesh = renderer.getMesh("basicCharacter");
+        this.playerController = new MeshController(renderer.gl, playerMesh);
+
         const N = 20;
         const transform = window.mat4.create();
+        const scaledBase = window.mat4.create();
+        window.mat4.scale(scaledBase, scaledBase, [8, 8, 8]);
         const pos = window.vec3.fromValues(0, 0, 0);
         for(let i = 0; i < N*N; ++i) {
             pos[0] = i % N;
@@ -78,7 +85,7 @@ class Scene {
                 renderer.gl,
                 window.mat4.translate(
                     transform,
-                    window.mat4.create(),
+                    scaledBase,
                     pos
                 )
             );

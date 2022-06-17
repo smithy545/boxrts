@@ -24,54 +24,16 @@ SOFTWARE.
 
 import { Camera } from "../Camera.js";
 import { loadFile } from "../ResourceLoaders.js";
-import { InstancedObject, InstanceList } from "./InstancedObject.js";
+import { InstancedObject } from "./InstancedObject.js";
 import { Mesh } from "./Mesh.js";
-
+import { RenderState } from "./RenderState.js";
+import { ShaderProgram } from "./ShaderProgram.js";
+import { ImageTexture } from "./ImageTexture.js";
+import { SpritesheetInfo } from "./SpritesheetInfo.js";
+import { TilesheetInfo } from "./TilesheetInfo.js";
+import { SceneNode } from "./SceneNode.js";
 
 declare var window: any;
-
-interface ShaderProgram {
-    program: WebGLProgram;
-    attribLocations: {[attributeName: string]: GLint};
-    uniformLocations: {[uniformName: string]: WebGLUniformLocation};
-}
-
-interface ImageTexture {
-    id: WebGLTexture;
-    base: HTMLImageElement;
-};
-
-class RenderState {
-    activeShader: string;
-    loadedShaders: {[name: string]: ShaderProgram};
-    loadedTextures: {[name: string]: ImageTexture};
-    loadedObjects: InstancedObject[];
-
-    constructor() {
-        this.activeShader = "";
-        this.loadedShaders = {};
-        this.loadedObjects = [];
-        this.loadedTextures = {};
-    }
-
-    get shader(): ShaderProgram {
-        return this.loadedShaders[this.activeShader];
-    }
-};
-
-interface TilesheetInfo {
-    name: string;
-    tileWidth: number;
-    tileHeight: number;
-    margin: number;
-};
-
-interface SpritesheetInfo {
-    name: string;
-    spriteWidth: number;
-    spriteHeight: number;
-    margin: number;
-};
 
 interface TilesheetTexture extends ImageTexture {
     info: TilesheetInfo;
@@ -81,15 +43,41 @@ interface SpritesheetTexture extends ImageTexture {
     info: SpritesheetInfo;
 };
 
+class SceneRoot implements SceneNode {
+    children: SceneNode[];
+    objects: InstancedObject[];
+    parent: SceneNode;
+
+    constructor() {
+        this.children = [];
+        this.objects = [];
+        this.parent = null;
+    }
+
+    setParent(parent: SceneNode) {
+        this.parent = parent;
+    }
+
+    addChild(child: SceneNode) {
+        this.children.push(child);
+    }
+    
+    addObject(object: InstancedObject) {
+        this.objects.push(object);
+    }
+};
+
 class Renderer {
     camera: Camera;
     gl: WebGL2RenderingContext;
     state: RenderState;
     projectionMatrix: Float32Array;
+    root: SceneRoot;
 
     constructor(context: WebGL2RenderingContext) {
         this.gl = context;
-        this.state = new RenderState();
+        this.root = new SceneRoot();
+        this.state = new RenderState(this.root as SceneNode);
 
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // clear canvas to black
         this.gl.clearDepth(1.0); // clear depth buffer
@@ -116,19 +104,38 @@ class Renderer {
         this.gl.useProgram(this.state.shader.program);
         this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
         this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.viewMatrix);
-        for(let key in this.state.loadedObjects) {
-            let obj = this.state.loadedObjects[key];
-            this.gl.bindVertexArray(obj.vao);
-            for(let i = 0; i < obj.textures.length; ++i) {
-                this.gl.uniform1i(this.state.shader.uniformLocations[`sampler${i}`], i);
-                this.gl.activeTexture(this.gl.TEXTURE0 + i);
-                this.gl.bindTexture(this.gl.TEXTURE_2D, this.state.loadedTextures[obj.textures[i]].id);
+        let node = this.state.sceneRoot;
+        let children: SceneNode[] = [node].concat(node.children);
+        do {
+            let next: SceneNode[] = [];
+            for(let i = 0; i < children.length; ++i) {
+                const child = children[i];
+                const objects = child.objects;
+                for(let j = 0; j < objects.length; ++j) {
+                    let obj = objects[j];
+                    this.gl.bindVertexArray(obj.vao);
+                    for(let k = 0; k < obj.textures.length; ++k) {
+                        this.gl.uniform1i(this.state.shader.uniformLocations[`sampler${k}`], k);
+                        this.gl.activeTexture(this.gl.TEXTURE0 + k);
+                        this.gl.bindTexture(this.gl.TEXTURE_2D, this.state.loadedTextures[obj.textures[k]].id);
+                    }
+                    this.gl.drawElementsInstanced(obj.mode, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
+                }
+                next = next.concat(child.children);
             }
-            this.gl.drawElementsInstanced(obj.mode, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
-        }
+            children = next;
+        } while(children.length > 0);
     }
 
-    loadMeshObject(data: string) : Mesh {
+    getMesh(name: string) : Mesh | null{
+        for(let i = 0; i < this.state.loadedMeshes.length; ++i) {
+            if(name === this.state.loadedMeshes[i].name)
+                return this.state.loadedMeshes[i];
+        }
+        return null;
+    }
+
+    loadMeshObject(data: string, name?: string) : Mesh {
         let geometryCoords: number[] = [];
         let textureCoords: number[] = [];
         let normalCoords: number[] = [];
@@ -138,10 +145,10 @@ class Renderer {
         let groupName = null;
         let materialName = null;
         let mode = this.gl.TRIANGLES;
-        let mesh = new Mesh();
+        let mesh = new Mesh(name);
 
         // TODO: handle Bezier curves, 3D textures and other cool shit like that
-        const lines = data.split(/\n/);
+        const lines = data.split(/\n/).concat(['g']);
         for(let i = 0; i < lines.length; ++i) {
             const tokens = lines[i].split(/\s/).filter((token: string) => {
                 return token.length > 0;
@@ -185,7 +192,7 @@ class Renderer {
                 mode = this.gl.LINES;
             } else if (tokens[0] === 'mtllib') { // associated .mtl file
                 // TODO: mats
-            } else if(tokens[0] === 'o') { // new model
+            } else if(tokens[0] === 'o') { // new model name
                 mesh.name = tokens[1];
             } else if(tokens[0] === 'g') { // new polygon group
                 if(vertexIndices.length > 0) {
@@ -228,7 +235,7 @@ class Renderer {
                         let normals = [];
                         let indices = [];
                         for(let j = 0; j < vertexIndices.length; ++j) {
-                            // 1-indexed kenney assets? why???
+                            // 1-indexed because obj I'm using is like that
                             let posIndex = 4*(vertexIndices[j]-1);
                             coords.push(geometryCoords[posIndex]);
                             coords.push(geometryCoords[posIndex + 1]);
@@ -259,6 +266,7 @@ class Renderer {
                         mesh.addComponent(groupObject);
                     else
                         mesh.addComponent(groupObject, groupName);
+                    this.state.sceneRoot.addObject(groupObject); // add for later instancing
                 }
                 groupName = tokens[1];
             } else if(tokens[0] === 'usemtl') { // use material?
@@ -270,20 +278,7 @@ class Renderer {
         console.info(`${geometryCoords.length/4} geometry vertices loaded.`);
         console.info(`${textureCoords.length/2} texture vertices loaded.`);
         console.info(`${normalCoords.length/3} normal vertices loaded.`);
-
-        let components: InstancedObject[] = [];
-        for(let i = 0; i < mesh.components.length; ++i) {
-            let component = mesh.components[i];
-            component.addInstance(this.gl, window.mat4.create());
-            components.push(component);
-        }
-        for(let key in mesh.namedComponents) {
-            let component = mesh.namedComponents[key];
-            component.addInstance(this.gl, window.mat4.create());
-            components.push(component);
-        }
-        this.state.loadedObjects = this.state.loadedObjects.concat(components);
-
+        this.state.loadedMeshes.push(mesh);
         return mesh;
     }
 
@@ -336,7 +331,7 @@ class Renderer {
         let fieldOfView = 45 * Math.PI / 180;
         let aspect = this.gl.canvas.width / this.gl.canvas.height;
         let zNear = 0.1;
-        let zFar = 100.0;
+        let zFar = 1000.0;
         this.projectionMatrix = window.mat4.create();
         window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
     }
@@ -379,7 +374,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
 
@@ -427,7 +421,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
 
@@ -475,7 +468,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
 
@@ -529,7 +521,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
 
@@ -583,7 +574,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
 
@@ -659,4 +649,4 @@ class Renderer {
     }
 };
 
-export { Renderer, InstanceList, InstancedObject };
+export { Renderer };

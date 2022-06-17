@@ -38,45 +38,87 @@ interface InstanceList {
     buffer: WebGLBuffer;
 };
 
+// fucking around with private variables cause why not
 class InstancedObject {
-    vao: WebGLVertexArrayObject;
-    index: IndexAttribute
-    instances: InstanceList;
-    mode: GLenum;
-    textures: string[];
+    private _instances: InstanceList;
+    private _vao: WebGLVertexArrayObject;
+    private _index: IndexAttribute
+    private _mode: GLenum;
+    private _textures: string[];
 
     constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer, mode: GLenum) {
-        this.vao = vao;
-        this.instances = {
+        this._vao = vao;
+        this._instances = {
             buffer: matrixBuffer,
             count: 0
         };
-        this.mode = mode;
-        this.textures = [];
+        this._mode = mode;
+        this._textures = [];
+    }
+
+    clone(gl: WebGL2RenderingContext, vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer) : InstancedObject {
+        const obj = new InstancedObject(vao, matrixBuffer, this._mode);
+        if(this._instances.data) {
+            obj.addInstance(gl, this._instances.data); // add instance data
+            obj._instances.count = this._instances.count; // overwrite count
+        }
+        return obj;
+    }
+
+    get textures() : string[] {
+        return this._textures;
+    }
+    
+    get mode() : GLenum {
+        return this._mode;
+    }
+
+    set mode(mode: GLenum) {
+        this._mode = mode;
+    }
+
+    get index() : IndexAttribute {
+        return this._index;
+    }
+
+    set index(index: IndexAttribute) {
+        this._index = index;
+    }
+
+    get vao() : WebGLVertexArrayObject {
+        return this._vao;
+    }
+
+    set vao(vao: WebGLVertexArrayObject) {
+        this._vao = vao;
+    }
+
+    get instances() : InstanceList {
+        return this._instances;
     }
 
     addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) : number {
         if(!instanceData)
             instanceData = new Float32Array(window.mat4.create());
-        if(this.instances.data)
-            this.instances.data = Float32Array.of(...this.instances.data, ...instanceData);
+        if(this._instances.data)
+            this._instances.data = Float32Array.of(...this._instances.data, ...instanceData);
         else
-            this.instances.data = instanceData;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this.instances.data, gl.STATIC_DRAW);
-        this.instances.count += 1;
-        return this.instances.count - 1;
+            this._instances.data = instanceData;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._instances.buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this._instances.data, gl.STATIC_DRAW);
+        this._instances.count += 1;
+        return this._instances.count - 1;
     }
 
     modifyInstance(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
         let offset = 4*4*instanceIndex;
-        this.instances.data.set(instanceData, offset);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
+        this._instances.data.set(instanceData, offset);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._instances.buffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT, instanceData);
     }
 
     addTexture(texture: string) {
-        this.textures.push(texture);
+        this._textures.push(texture);
     }
 };
 
