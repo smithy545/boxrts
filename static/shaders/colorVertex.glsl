@@ -22,13 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-attribute vec3 aVertexPosition;
+attribute vec4 aVertexPosition;
 attribute vec4 aVertexColor;
+attribute vec3 aVertexNormal;
 attribute mat4 aInstanceMatrix;
+
 uniform mat4 uViewMatrix;
 uniform mat4 uProjectionMatrix;
+
 varying lowp vec4 vColor;
+varying highp vec3 vNormalCoord;
+
 void main(void) {
-    gl_Position = uProjectionMatrix * uViewMatrix * aInstanceMatrix * vec4(aVertexPosition, 1);
+    gl_Position = uProjectionMatrix * uViewMatrix * aInstanceMatrix * aVertexPosition;
     vColor = aVertexColor;
+    vNormalCoord = aVertexNormal;
 }

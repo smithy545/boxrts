@@ -53,26 +53,10 @@ function main() {
         console.info("Bootstrap json loaded.");
         const constants = JSON.parse(request.responseText);
 
-        // load object model files
-        const objectFiles = constants["objects"];
-        const objectFileStatus: {[filename: string]: boolean} = {};
-        for(let i = 0; i < objectFiles.length; i++) {
-            const path: string = objectFiles[i];
-            objectFileStatus[path] = false;
-            console.info(`Requesting obj file: ${path}`)
-            loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
-                objectFileStatus[path] = true;
-                console.info(`Object loaded at ${path}:`);
-                renderer.loadObject(req.responseText);
-            }, (ev) => {
-                console.error(ev);
-            }, "application/obj");
-        }
-
         // load image files to textures
         const imageFiles = constants["images"];
         const imageFileStatus: {[filename: string]: boolean} = {};
-        for(let i = 0; i < imageFiles.length; i++) {
+        for(let i = 0; i < imageFiles.length; ++i) {
             const path: string = imageFiles[i];
             imageFileStatus[path] = false;
             console.info(`Requesting img file: ${path}`)
@@ -128,7 +112,7 @@ function main() {
 
             console.info("Intitializing renderer...");
             const shaders = constants["shaders"];
-            for(let i = 0; i < shaders.length; i++) {
+            for(let i = 0; i < shaders.length; ++i) {
                 renderer.loadShaderProgram(shaders[i]);
             }
 
@@ -145,8 +129,27 @@ function main() {
                 renderer.setActiveShaderProgram("texture");
                 return renderer.ready;
             }, () => {
-                console.info("Renderer initialized. Starting game loop.");
+                console.info("Renderer initialized.");
+
+                // load object model files
+                const objectFiles = constants["objects"];
+                const objectFileStatus: {[filename: string]: boolean} = {};
+                for(let i = 0; i < objectFiles.length; ++i) {
+                    const path: string = objectFiles[i];
+                    objectFileStatus[path] = false;
+                    console.info(`Requesting obj file: ${path}`)
+                    loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
+                        objectFileStatus[path] = true;
+                        console.info(`Object loaded at ${path}:`);
+                        renderer.loadMeshObject(req.responseText);
+                    }, (ev) => {
+                        console.error(ev);
+                    }, "application/obj");
+                }
+
                 scene.setup(renderer);
+
+                console.info("Starting game loop.");
                 window.requestAnimationFrame(tick);
             }, 1000);
         });

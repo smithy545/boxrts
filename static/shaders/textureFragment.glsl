@@ -23,6 +23,7 @@ SOFTWARE.
 */
 
 varying highp vec2 vTextureCoord;
+varying highp vec3 vNormalCoord;
 
 uniform sampler2D uSampler;
 

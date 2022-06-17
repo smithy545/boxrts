@@ -6,6 +6,7 @@
     "attributes": {
         "vertexPosition": "aVertexPosition",
         "vertexColor": "aVertexColor",
+        "vertexNormal": "aVertexNormal",
         "instanceMatrix": "aInstanceMatrix"
     }
 }

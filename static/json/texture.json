@@ -7,6 +7,7 @@
     "attributes": {
         "vertexPosition": "aVertexPosition",
         "textureCoord": "aTextureCoord",
+        "vertexNormal": "aVertexNormal",
         "instanceMatrix": "aInstanceMatrix"
     }
 }

@@ -23,6 +23,8 @@ SOFTWARE.
 */
 
 varying lowp vec4 vColor;
+varying highp vec3 vNormalCoord;
+
 void main(void) {
     gl_FragColor = vColor;
 }

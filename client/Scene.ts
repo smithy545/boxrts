@@ -24,6 +24,9 @@ SOFTWARE.
 
 import { InstancedObject, Renderer } from "./Renderer.js";
 
+
+declare var window: any;
+
 class Scene {
     instancedFloor: InstancedObject;
 
@@ -32,26 +35,82 @@ class Scene {
     setup(renderer: Renderer) {
         // floor verts/colors/indices
         const positions = [
-            -10, 0, -10,
-            -10, 0, 10,
-            10, 0, -10,
-            10, 0, 10
-        ];
-        const colors = [
-            1, 0, 0, 1,
-            0, 1, 0, 1,
+            0, 0, 0, 1,
             0, 0, 1, 1,
+            1, 0, 0, 1,
             1, 0, 1, 1
         ];
+        const normals = [
+            0, 0, 0,
+            0, 0, 1,
+            1, 0, 0,
+            1, 0, 1
+        ];
+        let width = 1760.;
+        let height = 704.;
+        let tw = 64.;
+        let th = 64.;
+        let margin = 32;
+        let nw = 18;
+        let n = 0;
+        let ix = (margin + (tw + margin) * (n % nw) ) / width;
+        let iy = (margin + (th + margin) * Math.floor(n / nw)) / height;
+        let iw = tw / width;
+        let ih = th / height;
         const uvs = [
-            0, 0,
-            0, 1,
-            1, 0,
-            1, 1
-        ]
+            ix, iy,
+            ix, iy + ih,
+            ix + iw, iy,
+            ix + iw, iy + ih
+        ];
         const indices = [0, 1, 2, 3, 2, 1];
-        this.instancedFloor = renderer.createTexturedInstancedObject("medievalTile_58", positions, uvs, indices);
-        this.instancedFloor.addInstance(renderer.gl);
+        this.instancedFloor = renderer.createTexturedTriangleMesh("medieval_tilesheet", positions, uvs, normals, indices);
+
+        const N = 20;
+        const transform = window.mat4.create();
+        const pos = window.vec3.fromValues(0, 0, 0);
+        for(let i = 0; i < N*N; ++i) {
+            pos[0] = i % N;
+            pos[2] = Math.floor(i/N);
+            this.instancedFloor.addInstance(
+                renderer.gl,
+                window.mat4.translate(
+                    transform,
+                    window.mat4.create(),
+                    pos
+                )
+            );
+            pos[0] = -2*pos[0];
+            pos[2] = 0;
+            this.instancedFloor.addInstance(
+                renderer.gl,
+                window.mat4.translate(
+                    transform,
+                    transform,
+                    pos
+                )
+            );
+            pos[0] = 0;
+            pos[2] = -2*Math.floor(i/N);
+            this.instancedFloor.addInstance(
+                renderer.gl,
+                window.mat4.translate(
+                    transform,
+                    transform,
+                    pos
+                )
+            );
+            pos[0] = 2*(i % N);
+            pos[2] = 0;
+            this.instancedFloor.addInstance(
+                renderer.gl,
+                window.mat4.translate(
+                    transform,
+                    transform,
+                    pos
+                )
+            );
+        }
     }
 
 };

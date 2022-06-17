@@ -26,13 +26,13 @@ SOFTWARE.
 declare var window: any;
 
 class Camera {
-    view: Float32Array;
+    viewMatrix: Float32Array;
     position: Float32Array;
     forward: Float32Array;
     up: Float32Array;
 
     constructor(position: Float32Array, forward: Float32Array, up: Float32Array) {
-        this.view = window.mat4.create();
+        this.viewMatrix = window.mat4.create();
         this.position = position;
         this.forward = window.vec3.create();
         window.vec3.normalize(this.forward, forward);
@@ -100,13 +100,13 @@ class Camera {
     }
 
     lookAtMouse(dx: number, dy: number, canvas: HTMLCanvasElement) {
-        let view = window.mat4.create();
-        window.mat4.rotate(view, view, -2 * Math.PI * dx / canvas.width, this.up);
+        let transform = window.mat4.create();
+        window.mat4.rotate(transform, transform, -2 * Math.PI * dx / canvas.width, this.up);
         let temp = window.vec3.create(); // use as "right" directional vector
         let forward = window.vec3.clone(this.forward);
         window.vec3.cross(temp, forward, this.up);
-        window.mat4.rotate(view, view, -2 * Math.PI * dy / canvas.height, temp);
-        window.vec3.transformMat4(forward, forward, view);
+        window.mat4.rotate(transform, transform, -2 * Math.PI * dy / canvas.height, temp);
+        window.vec3.transformMat4(forward, forward, transform);
 
         // use temp to check forward x up collinearity 
         window.vec3.cross(temp, forward, this.up);
@@ -117,8 +117,8 @@ class Camera {
     }
 
     resetView() {
-        window.mat4.translate(this.view, window.mat4.create(), this.position);    
-        window.mat4.lookAt(this.view, this.position, [
+        window.mat4.translate(this.viewMatrix, window.mat4.create(), this.position);    
+        window.mat4.lookAt(this.viewMatrix, this.position, [
             this.position[0] + this.forward[0],
             this.position[1] + this.forward[1],
             this.position[2] + this.forward[2]

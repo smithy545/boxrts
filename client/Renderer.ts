@@ -28,7 +28,6 @@ import { loadFile } from "./ResourceLoaders.js";
 
 declare var window: any;
 
-
 interface ShaderProgram {
     program: WebGLProgram;
     attribLocations: {[attributeName: string]: GLint};
@@ -49,15 +48,18 @@ interface InstanceList {
 
 class InstancedObject {
     vao: WebGLVertexArrayObject;
-    index: IndexAttribute;
+    index: IndexAttribute
     instances: InstanceList;
+    mode: GLenum;
+    textures: WebGLTexture[];
 
-    constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer) {
+    constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer, mode: GLenum) {
         this.vao = vao;
         this.instances = {
             buffer: matrixBuffer,
             count: 0
         };
+        this.mode = mode;
     }
 
     addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) : number {
@@ -79,6 +81,52 @@ class InstancedObject {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT, instanceData);
     }
+
+    addTexture(texture: WebGLTexture) {
+        this.textures.push(texture);
+    }
+};
+
+class Mesh {
+    name?: string;
+    components: InstancedObject[];
+    namedComponents: {[name: string]: InstancedObject};
+
+    constructor(name?: string) {
+        this.components = []
+        this.namedComponents = {};
+        this.name = name;
+    }
+
+    addComponent(childObject: InstancedObject, name?: string) {
+        if(name !== undefined)
+            this.namedComponents[name] = childObject;
+        else
+            this.components.push(childObject);
+    }
+};
+
+interface ImageTexture {
+    id: WebGLTexture;
+    base: HTMLImageElement;
+};
+
+class RenderState {
+    activeShader: string;
+    loadedShaders: {[name: string]: ShaderProgram};
+    loadedTextures: {[name: string]: ImageTexture};
+    loadedObjects: InstancedObject[];
+
+    constructor() {
+        this.activeShader = "";
+        this.loadedShaders = {};
+        this.loadedObjects = [];
+        this.loadedTextures = {};
+    }
+
+    get shader(): ShaderProgram {
+        return this.loadedShaders[this.activeShader];
+    }
 };
 
 interface TilesheetInfo {
@@ -95,31 +143,18 @@ interface SpritesheetInfo {
     margin: number;
 };
 
-class RenderState {
-    activeShader: string;
-    loadedShaders: {[name: string]: ShaderProgram};
-    loadedTextures: {[name: string]: WebGLTexture};
-    loadedObjects: InstancedObject[];
+interface TilesheetTexture extends ImageTexture {
+    info: TilesheetInfo;
+};
 
-    constructor() {
-        this.activeShader = "";
-        this.loadedShaders = {};
-        this.loadedObjects = [];
-        this.loadedTextures = {};
-    }
-
-    get shader(): ShaderProgram | null {
-        if(this.activeShader in this.loadedShaders)
-            return this.loadedShaders[this.activeShader];
-        return null;
-    }
+interface SpritesheetTexture extends ImageTexture {
+    info: SpritesheetInfo;
 };
 
 class Renderer {
     camera: Camera;
     gl: WebGL2RenderingContext;
     state: RenderState;
-    instancedFloor: InstancedObject;
     projectionMatrix: Float32Array;
 
     constructor(context: WebGL2RenderingContext) {
@@ -143,47 +178,156 @@ class Renderer {
     }
 
     get ready() {
-        return this.state.shader !== null;
+        return this.state.activeShader in this.state.loadedShaders;
     }
 
-    loadObject(data: string) {
-        let positions: number[] = [];
-        let colors: number[] = [];
-        let indices: number[] = [];
+    loadMeshObject(data: string) : Mesh {
+        let geometryCoords: number[] = [];
+        let textureCoords: number[] = [];
+        let normalCoords: number[] = [];
+        let vertexIndices: number[] = [];
+        let textureIndices: number[] = [];
+        let normalIndices: number[] = [];
+        let meshName = null;
+        let materialName = null;
+        let mode = null;
+        let mesh = new Mesh();
 
+        // TODO: handle Bezier curves, 3D textures and other cool shit like that
         const lines = data.split(/\n/);
-        for(let i = 0; i < lines.length; i++) {
+        for(let i = 0; i < lines.length; ++i) {
             const tokens = lines[i].split(/\s/).filter((token: string) => {
                 return token.length > 0;
             });
             if(tokens.length === 0)
                 continue;
-            if(tokens[0] === 'v') { // vertex position
-                positions = positions.concat([
-                    parseInt(tokens[1]),
-                    parseInt(tokens[2]),
-                    parseInt(tokens[3])
+            if(tokens[0] === 'v') { // vertex coords
+                geometryCoords = geometryCoords.concat([
+                    parseFloat(tokens[1]), // x
+                    parseFloat(tokens[2]), // y
+                    parseFloat(tokens[3]), // z
+                    1.0 // w
                 ]);
-            } else if(tokens[0] === 'vt') { // vertex uv
-                // TODO: replace colors with uvs
-                colors = colors.concat([
-                    parseInt(tokens[1]),
-                    parseInt(tokens[2])
-                ]);
+            } else if(tokens[0] === 'vt') { // texture coords
+                textureCoords.push(parseFloat(tokens[1])); // u
+                textureCoords.push(parseFloat(tokens[2])); // v
             } else if(tokens[0] === 'vn') { // vertex normal
-                // TODO: do shit with normals
+                normalCoords = normalCoords.concat([
+                    parseFloat(tokens[1]), // i
+                    parseFloat(tokens[2]), // j
+                    parseFloat(tokens[3])  // k
+                ]);
+            } else if(tokens[0] === 'f') { // face
+                // add face indices for use in GL_TRIANGLES mode
+                for(let i = 1; i < tokens.length; ++i) {
+                    const indices = tokens[i].split('/');
+                    vertexIndices.push(parseInt(indices[0])); // v index
+                    if(indices[1].length > 0)
+                        textureIndices.push(parseInt(indices[1])); // vt index
+                    if(indices[2].length > 0)
+                        normalIndices.push(parseInt(indices[2])); // vn index
+                }
+                mode = this.gl.TRIANGLES;
+            } else if(tokens[0] === 'p') { // point
+                // add indices for use in GL_POINTS mode
+                for(let i = 1; i < tokens.length; ++i)
+                    vertexIndices.push(parseInt(tokens[i]));
+                mode = this.gl.POINTS;
+            } else if(tokens[0] === 'l') { // line
+                // add both indices for use in GL_LINES mode
+                for(let i = 1; i < tokens.length; ++i) {
+                    const indices = tokens[i].split('/');
+                    vertexIndices.push(parseInt(indices[0]));
+                    if(indices[1].length > 0)
+                        textureIndices.push(parseInt(indices[1]));
+                }
+                mode = this.gl.LINES;
+            } else if (tokens[0] === 'mtllib') { // associated .mtl file
+                // TODO: mats
+            } else if(tokens[0] === 'o') { // new model
+                mesh.name = tokens[1];
+            } else if(tokens[0] === 'g') { // new polygon group
+                if(vertexIndices.length > 0) {
+                    let groupObject: InstancedObject;
+                    if(mode === this.gl.POINTS) {
+                        let coords = [];
+                        let indices = [];
+                        for(let i = 0; i < vertexIndices.length; ++i){
+                            let index = 4*vertexIndices[i];
+                            coords.push(geometryCoords[index]);
+                            coords.push(geometryCoords[index + 1]);
+                            coords.push(geometryCoords[index + 2]);
+                            coords.push(geometryCoords[index + 3]);
+                            indices.push(i);
+                        }
+                        groupObject = this.createPointsMesh(coords, indices);
+                    } else if(mode === this.gl.LINES) {
+                        let coords = [];
+                        let uvs = [];
+                        let indices = [];
+                        for(let i = 0; i < vertexIndices.length; ++i){
+                            let posIndex = 4*vertexIndices[i];
+                            coords.push(geometryCoords[posIndex]);
+                            coords.push(geometryCoords[posIndex + 1]);
+                            coords.push(geometryCoords[posIndex + 2]);
+                            coords.push(geometryCoords[posIndex + 3]);
+                            if(i < textureIndices.length) {
+                                let texIndex = 2*textureIndices[i];
+                                uvs.push(textureCoords[texIndex]);
+                                uvs.push(textureCoords[texIndex + 1]);
+                            }
+                            indices.push(i);
+                        }
+                        groupObject = this.createLinesMesh(coords, uvs, indices);
+                    } else if(mode === this.gl.TRIANGLES) {
+                        let coords = [];
+                        let uvs = [];
+                        let normals = [];
+                        let indices = [];
+                        for(let i = 0; i < vertexIndices.length; ++i){
+                            let posIndex = 4*vertexIndices[i];
+                            coords.push(geometryCoords[posIndex]);
+                            coords.push(geometryCoords[posIndex + 1]);
+                            coords.push(geometryCoords[posIndex + 2]);
+                            coords.push(geometryCoords[posIndex + 3]);
+                            if(i < textureIndices.length) {
+                                let texIndex = 2*textureIndices[i];
+                                uvs.push(textureCoords[texIndex]);
+                                uvs.push(textureCoords[texIndex + 1]);
+                            }
+                            if(i < normalIndices.length) {
+                                let normalIndex = 3*normalIndices[i];
+                                normals.push(normalCoords[normalIndex]);
+                                normals.push(normalCoords[normalIndex + 1]);
+                                normals.push(normalCoords[normalIndex + 2]);
+                            }
+                            indices.push(i);
+                        }
+                        groupObject = this.createTexturedTriangleMesh(materialName, coords, uvs, normals, indices);
+                    }
+                    if(meshName === null) {
+                        mesh.addComponent(groupObject);
+                    } else {
+                        mesh.addComponent(groupObject, meshName);
+                    }
+                }
+                meshName = tokens[1];
+            } else if(tokens[0] === 'usemtl') { // use material?
+                materialName = tokens[1];
+            } else {
+                console.log(lines[i]);
             }
         }
-        console.log(positions);
-        console.log(colors);
-        console.log(indices);
+        console.info(`${geometryCoords.length/4} vertices loaded.`);
+        return mesh;
     }
 
     loadTilesheet(name: string, img: HTMLImageElement) {
         // load accompanying text file to get tile size and margins
         loadFile(`./json/${name}.json`, (xhr: XMLHttpRequest) => {
-            const info: TilesheetInfo = JSON.parse(xhr.responseText);
-            const versionMatch = name.match(/(@\d)/);
+            let texture = this.readImgToTexture(img, this.gl.RGBA, this.gl.UNSIGNED_BYTE) as TilesheetTexture;
+            texture.info = JSON.parse(xhr.responseText);
+            this.state.loadedTextures[name] = texture;
         }, (ev) => {
             console.error(ev);
         }, "application/json");
@@ -192,8 +336,9 @@ class Renderer {
     loadSpritesheet(name: string, img: HTMLImageElement) {
         // load accompanying text file to get sprite info
         loadFile(`./json/${name}.json`, (xhr: XMLHttpRequest) => {
-            const info: SpritesheetInfo = JSON.parse(xhr.responseText);
-            const versionMatch = name.match(/(@\d)/);
+            let texture = this.readImgToTexture(img, this.gl.RGBA, this.gl.UNSIGNED_BYTE) as SpritesheetTexture;
+            texture.info = JSON.parse(xhr.responseText);
+            this.state.loadedTextures[name] = texture;
         }, (ev) => {
             console.error(ev);
         }, "application/json");
@@ -206,13 +351,14 @@ class Renderer {
     readImgToTexture(img: HTMLImageElement,
         format: GLenum,
         type: GLenum,
-        x: number = 0,
-        y: number = 0,
         width: number = img.width,
         height: number = img.height,
-        lod: number = 0) {
-        const texture: WebGLTexture = this.gl.createTexture();
-        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        lod: number = 0) : ImageTexture {
+        let texture: ImageTexture = {
+            id: this.gl.createTexture(),
+            base: img
+        };
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture.id);
         this.gl.texImage2D(this.gl.TEXTURE_2D, lod, this.gl.RGBA, width, height, 0, format, type, img);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.REPEAT);
@@ -234,22 +380,68 @@ class Renderer {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         this.gl.useProgram(this.state.shader.program);
         this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.view);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.viewMatrix);
         for(let key in this.state.loadedObjects) {
             let obj = this.state.loadedObjects[key];
             this.gl.bindVertexArray(obj.vao);
-            this.gl.drawElementsInstanced(this.gl.TRIANGLES, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
+            for(let i = 0; i < obj.textures.length; ++i) {
+                this.gl.activeTexture(this.gl.TEXTURE0 + i);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, obj.textures[i]);
+            }
+            this.gl.drawElementsInstanced(obj.mode, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
         }
     }
 
-    createInstancedObject(positions: number[], colors: number[], indices: number[]) : InstancedObject {
+    createPointsMesh(positions: number[], indices: number[]) : InstancedObject {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
         let vertexBuf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
+
+        let matrixBuf = this.gl.createBuffer();
+        let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrixBuf); // don't initialize any instances yet
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 3, 4, this.gl.FLOAT, false, 4*vec4Size, 3 * vec4Size);
+
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 1);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 2);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 3);
+
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 1, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 2, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 3, 1);
+
+        let indexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+
+        let builtObject = new InstancedObject(vao, matrixBuf, this.gl.POINTS);
+        builtObject.index = {
+            count: indices.length,
+            type: this.gl.UNSIGNED_SHORT,
+            offset: 0
+        };
+        this.state.loadedObjects.push(builtObject);
+        return builtObject;
+    }
+
+    createLinesMesh(positions: number[], colors: number[], indices: number[], loop: boolean = false) : InstancedObject {
+        let vao = this.gl.createVertexArray();
+        this.gl.bindVertexArray(vao);
+
+        let vertexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 4, this.gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
 
         let colorBuf = this.gl.createBuffer();
@@ -280,7 +472,7 @@ class Renderer {
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
 
-        let builtObject = new InstancedObject(vao, matrixBuf);
+        let builtObject = new InstancedObject(vao, matrixBuf, loop ? this.gl.LINE_LOOP : this.gl.LINES);
         builtObject.index = {
             count: indices.length,
             type: this.gl.UNSIGNED_SHORT,
@@ -290,14 +482,14 @@ class Renderer {
         return builtObject;
     }
 
-    createTexturedInstancedObject(name: string, positions: number[], uvs: number[], indices: number[]) : InstancedObject {
+    createTexturedLinesMesh(name: string, positions: number[], uvs: number[], indices: number[], loop: boolean = false) : InstancedObject {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
         let vertexBuf = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 4, this.gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
 
         let uvBuf = this.gl.createBuffer();
@@ -328,16 +520,122 @@ class Renderer {
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
 
-        this.gl.activeTexture(this.gl.TEXTURE0);
-        this.gl.bindTexture(this.gl.TEXTURE_2D, this.state.loadedTextures[name]);
-        this.gl.uniform1i(this.state.shader.uniformLocations.sampler, 0);
-
-        let builtObject = new InstancedObject(vao, matrixBuf);
+        let builtObject = new InstancedObject(vao, matrixBuf, loop ? this.gl.LINE_LOOP : this.gl.LINES);
         builtObject.index = {
             count: indices.length,
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
+        builtObject.textures = [this.state.loadedTextures[name].id];
+        this.state.loadedObjects.push(builtObject);
+        return builtObject;
+    }
+
+    createTriangleMesh(positions: number[], colors: number[], normals: number[], indices: number[]) : InstancedObject {
+        let vao = this.gl.createVertexArray();
+        this.gl.bindVertexArray(vao);
+
+        let vertexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
+
+        let colorBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, colorBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexColor, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexColor);
+
+        let normalBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, normalBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(normals), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexNormal, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexNormal);
+
+        let matrixBuf = this.gl.createBuffer();
+        let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrixBuf); // don't initialize any instances yet
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 3, 4, this.gl.FLOAT, false, 4*vec4Size, 3 * vec4Size);
+
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 1);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 2);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 3);
+
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 1, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 2, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 3, 1);
+
+        let indexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+
+        let builtObject = new InstancedObject(vao, matrixBuf, this.gl.TRIANGLES);
+        builtObject.index = {
+            count: indices.length,
+            type: this.gl.UNSIGNED_SHORT,
+            offset: 0
+        };
+        this.state.loadedObjects.push(builtObject);
+        return builtObject;
+    }
+
+    createTexturedTriangleMesh(name: string, positions: number[], uvs: number[], normals: number[], indices: number[]) : InstancedObject {
+        let vao = this.gl.createVertexArray();
+        this.gl.bindVertexArray(vao);
+
+        let vertexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexPosition, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexPosition);
+
+        let uvBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, uvBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(uvs), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.textureCoord, 2, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.textureCoord);
+
+        let normalBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, normalBuf);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(normals), this.gl.STATIC_DRAW);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.vertexNormal, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.vertexNormal);
+
+        let matrixBuf = this.gl.createBuffer();
+        let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrixBuf); // don't initialize any instances yet
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 3, 4, this.gl.FLOAT, false, 4*vec4Size, 3 * vec4Size);
+
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 1);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 2);
+        this.gl.enableVertexAttribArray(this.state.shader.attribLocations.instanceMatrix + 3);
+
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 1, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 2, 1);
+        this.gl.vertexAttribDivisor(this.state.shader.attribLocations.instanceMatrix + 3, 1);
+
+        let indexBuf = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuf);
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+
+        let builtObject = new InstancedObject(vao, matrixBuf, this.gl.TRIANGLES);
+        builtObject.index = {
+            count: indices.length,
+            type: this.gl.UNSIGNED_SHORT,
+            offset: 0
+        };
+        builtObject.textures = [this.state.loadedTextures[name].id];
         this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
@@ -348,7 +646,7 @@ class Renderer {
     }
 
     loadShaderProgram(name: string, activateOnLoad: boolean = false) {
-        const infoFilePath = `shaders/${name}.json`;
+        const infoFilePath = `json/${name}.json`;
         const vertexFilePath = `shaders/${name}Vertex.glsl`;
         const fragmentFilePath = `shaders/${name}Fragment.glsl`;
         loadFile(infoFilePath, (xhr) => {

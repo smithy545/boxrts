@@ -1,5 +1,9 @@
 build/
 external/
 .vscode/
+.DS_Store
 *.js
 *.js.*
+*.obj
+*.mtl
+*.png

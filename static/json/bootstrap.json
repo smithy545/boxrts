@@ -7,11 +7,11 @@
         }
     },
     "shaders": ["color", "texture"],
-    "objects": ["cube.obj"],
+    "objects": ["cube.obj", "basicCharacter.obj", "advancedCharacter.obj"],
     "images": [
-        "medievalTile_58.png",
         "medieval_tilesheet.png",
-        "medieval_tilesheet@2.png",
         "scifi_tilesheet.png",
-        "scifi_tilesheet@2.png"]
+        "face_adventurer.png",
+        "skin_adventurer.png"
+    ]
 }
