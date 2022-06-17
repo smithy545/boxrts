@@ -22,7 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { InstancedObject, Renderer } from "./Renderer.js";
+import { InstancedObject } from "./render/InstancedObject.js";
+import { Renderer } from "./render/Renderer.js";
 
 
 declare var window: any;
@@ -64,7 +65,8 @@ class Scene {
             ix + iw, iy + ih
         ];
         const indices = [0, 1, 2, 3, 2, 1];
-        this.instancedFloor = renderer.createTexturedTriangleMesh("medieval_tilesheet", positions, uvs, normals, indices);
+        this.instancedFloor = renderer.createTexturedTriangleMesh(positions, uvs, normals, indices);
+        this.instancedFloor.addTexture("medieval_tilesheet");
 
         const N = 20;
         const transform = window.mat4.create();

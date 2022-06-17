@@ -26,7 +26,7 @@ import { Scene } from "./Scene.js";
 import { CameraController } from "./CameraController.js";
 import { GameClient, WebSocketConfig } from "./GameClient.js";
 import { MainLoop } from "./MainLoop.js";
-import { Renderer } from "./Renderer.js";
+import { Renderer } from "./render/Renderer.js";
 import { loadImageFile, loadFile } from "./ResourceLoaders.js";
 
 

@@ -7,7 +7,7 @@
         }
     },
     "shaders": ["color", "texture"],
-    "objects": ["cube.obj", "basicCharacter.obj", "advancedCharacter.obj"],
+    "objects": ["basicCharacter.obj"],
     "images": [
         "medieval_tilesheet.png",
         "scifi_tilesheet.png",

@@ -22,8 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { Camera } from "./Camera.js";
-import { loadFile } from "./ResourceLoaders.js";
+import { Camera } from "../Camera.js";
+import { loadFile } from "../ResourceLoaders.js";
+import { InstancedObject, InstanceList } from "./InstancedObject.js";
+import { Mesh } from "./Mesh.js";
 
 
 declare var window: any;
@@ -33,78 +35,6 @@ interface ShaderProgram {
     attribLocations: {[attributeName: string]: GLint};
     uniformLocations: {[uniformName: string]: WebGLUniformLocation};
 }
-
-interface IndexAttribute {
-    count: number;
-    type: GLenum;
-    offset: number;
-};
-
-interface InstanceList {
-    data?: Float32Array;
-    count: number;
-    buffer: WebGLBuffer;
-};
-
-class InstancedObject {
-    vao: WebGLVertexArrayObject;
-    index: IndexAttribute
-    instances: InstanceList;
-    mode: GLenum;
-    textures: WebGLTexture[];
-
-    constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer, mode: GLenum) {
-        this.vao = vao;
-        this.instances = {
-            buffer: matrixBuffer,
-            count: 0
-        };
-        this.mode = mode;
-    }
-
-    addInstance(gl: WebGL2RenderingContext, instanceData?: Float32Array) : number {
-        if(!instanceData)
-            instanceData = new Float32Array(window.mat4.create());
-        if(this.instances.data)
-            this.instances.data = Float32Array.of(...this.instances.data, ...instanceData);
-        else
-            this.instances.data = instanceData;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this.instances.data, gl.STATIC_DRAW);
-        this.instances.count += 1;
-        return this.instances.count - 1;
-    }
-
-    modifyInstance(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
-        let offset = 4*4*instanceIndex;
-        this.instances.data.set(instanceData, offset);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.instances.buffer);
-        gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT, instanceData);
-    }
-
-    addTexture(texture: WebGLTexture) {
-        this.textures.push(texture);
-    }
-};
-
-class Mesh {
-    name?: string;
-    components: InstancedObject[];
-    namedComponents: {[name: string]: InstancedObject};
-
-    constructor(name?: string) {
-        this.components = []
-        this.namedComponents = {};
-        this.name = name;
-    }
-
-    addComponent(childObject: InstancedObject, name?: string) {
-        if(name !== undefined)
-            this.namedComponents[name] = childObject;
-        else
-            this.components.push(childObject);
-    }
-};
 
 interface ImageTexture {
     id: WebGLTexture;
@@ -181,6 +111,23 @@ class Renderer {
         return this.state.activeShader in this.state.loadedShaders;
     }
 
+    render(elapsedMs: number) {
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        this.gl.useProgram(this.state.shader.program);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
+        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.viewMatrix);
+        for(let key in this.state.loadedObjects) {
+            let obj = this.state.loadedObjects[key];
+            this.gl.bindVertexArray(obj.vao);
+            for(let i = 0; i < obj.textures.length; ++i) {
+                this.gl.uniform1i(this.state.shader.uniformLocations[`sampler${i}`], i);
+                this.gl.activeTexture(this.gl.TEXTURE0 + i);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, this.state.loadedTextures[obj.textures[i]].id);
+            }
+            this.gl.drawElementsInstanced(obj.mode, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
+        }
+    }
+
     loadMeshObject(data: string) : Mesh {
         let geometryCoords: number[] = [];
         let textureCoords: number[] = [];
@@ -188,9 +135,9 @@ class Renderer {
         let vertexIndices: number[] = [];
         let textureIndices: number[] = [];
         let normalIndices: number[] = [];
-        let meshName = null;
+        let groupName = null;
         let materialName = null;
-        let mode = null;
+        let mode = this.gl.TRIANGLES;
         let mesh = new Mesh();
 
         // TODO: handle Bezier curves, 3D textures and other cool shit like that
@@ -199,7 +146,7 @@ class Renderer {
             const tokens = lines[i].split(/\s/).filter((token: string) => {
                 return token.length > 0;
             });
-            if(tokens.length === 0)
+            if(tokens.length === 0 || tokens[0].length === 0)
                 continue;
             if(tokens[0] === 'v') { // vertex coords
                 geometryCoords = geometryCoords.concat([
@@ -217,29 +164,23 @@ class Renderer {
                     parseFloat(tokens[2]), // j
                     parseFloat(tokens[3])  // k
                 ]);
-            } else if(tokens[0] === 'f') { // face
-                // add face indices for use in GL_TRIANGLES mode
-                for(let i = 1; i < tokens.length; ++i) {
-                    const indices = tokens[i].split('/');
-                    vertexIndices.push(parseInt(indices[0])); // v index
-                    if(indices[1].length > 0)
-                        textureIndices.push(parseInt(indices[1])); // vt index
-                    if(indices[2].length > 0)
-                        normalIndices.push(parseInt(indices[2])); // vn index
+            } else if(tokens[0] === 'f') { // add face indices for use in GL_TRIANGLES mode
+                for(let j = 1; j < tokens.length; ++j) {
+                    const indices = tokens[j].split('/');
+                    vertexIndices.push(parseInt(indices[0]));  // v index
+                    textureIndices.push(parseInt(indices[1])); // vt index
+                    normalIndices.push(parseInt(indices[2]));  // vn index
                 }
                 mode = this.gl.TRIANGLES;
-            } else if(tokens[0] === 'p') { // point
-                // add indices for use in GL_POINTS mode
-                for(let i = 1; i < tokens.length; ++i)
-                    vertexIndices.push(parseInt(tokens[i]));
+            } else if(tokens[0] === 'p') { // add indices for use in GL_POINTS mode
+                for(let j = 1; j < tokens.length; ++j)
+                    vertexIndices.push(parseInt(tokens[j]));
                 mode = this.gl.POINTS;
-            } else if(tokens[0] === 'l') { // line
-                // add both indices for use in GL_LINES mode
-                for(let i = 1; i < tokens.length; ++i) {
-                    const indices = tokens[i].split('/');
+            } else if(tokens[0] === 'l') { // add both indices for use in GL_LINES and GL_LINE_LOOP mode
+                for(let j = 1; j < tokens.length; ++j) {
+                    const indices = tokens[j].split('/');
                     vertexIndices.push(parseInt(indices[0]));
-                    if(indices[1].length > 0)
-                        textureIndices.push(parseInt(indices[1]));
+                    textureIndices.push(parseInt(indices[1]));
                 }
                 mode = this.gl.LINES;
             } else if (tokens[0] === 'mtllib') { // associated .mtl file
@@ -252,73 +193,97 @@ class Renderer {
                     if(mode === this.gl.POINTS) {
                         let coords = [];
                         let indices = [];
-                        for(let i = 0; i < vertexIndices.length; ++i){
-                            let index = 4*vertexIndices[i];
+                        for(let j = 0; j < vertexIndices.length; ++j){
+                            let index = 4*vertexIndices[j];
                             coords.push(geometryCoords[index]);
                             coords.push(geometryCoords[index + 1]);
                             coords.push(geometryCoords[index + 2]);
                             coords.push(geometryCoords[index + 3]);
-                            indices.push(i);
+                            indices.push(j);
                         }
                         groupObject = this.createPointsMesh(coords, indices);
                     } else if(mode === this.gl.LINES) {
                         let coords = [];
                         let uvs = [];
                         let indices = [];
-                        for(let i = 0; i < vertexIndices.length; ++i){
-                            let posIndex = 4*vertexIndices[i];
+                        for(let j = 0; j < vertexIndices.length; ++j){
+                            let posIndex = 4*vertexIndices[j];
                             coords.push(geometryCoords[posIndex]);
                             coords.push(geometryCoords[posIndex + 1]);
                             coords.push(geometryCoords[posIndex + 2]);
                             coords.push(geometryCoords[posIndex + 3]);
-                            if(i < textureIndices.length) {
-                                let texIndex = 2*textureIndices[i];
+                            if(j < textureIndices.length) {
+                                let texIndex = 2*textureIndices[j];
                                 uvs.push(textureCoords[texIndex]);
-                                uvs.push(textureCoords[texIndex + 1]);
+                                uvs.push(1-textureCoords[texIndex + 1]);
                             }
-                            indices.push(i);
+                            indices.push(j);
                         }
-                        groupObject = this.createLinesMesh(coords, uvs, indices);
+                        groupObject = this.createLinesMesh(coords, uvs, indices, ((coords.length/4) % 2) !== 0);
+                        if(materialName !== null)
+                            groupObject.addTexture(materialName);
                     } else if(mode === this.gl.TRIANGLES) {
                         let coords = [];
                         let uvs = [];
                         let normals = [];
                         let indices = [];
-                        for(let i = 0; i < vertexIndices.length; ++i){
-                            let posIndex = 4*vertexIndices[i];
+                        for(let j = 0; j < vertexIndices.length; ++j) {
+                            // 1-indexed kenney assets? why???
+                            let posIndex = 4*(vertexIndices[j]-1);
                             coords.push(geometryCoords[posIndex]);
                             coords.push(geometryCoords[posIndex + 1]);
                             coords.push(geometryCoords[posIndex + 2]);
                             coords.push(geometryCoords[posIndex + 3]);
-                            if(i < textureIndices.length) {
-                                let texIndex = 2*textureIndices[i];
+                            if(j < textureIndices.length) {
+                                let texIndex = 2*(textureIndices[j]-1);
                                 uvs.push(textureCoords[texIndex]);
-                                uvs.push(textureCoords[texIndex + 1]);
+                                uvs.push(1-textureCoords[texIndex + 1]);
                             }
-                            if(i < normalIndices.length) {
-                                let normalIndex = 3*normalIndices[i];
+                            if(j < normalIndices.length) {
+                                let normalIndex = 3*(normalIndices[j]-1);
                                 normals.push(normalCoords[normalIndex]);
                                 normals.push(normalCoords[normalIndex + 1]);
                                 normals.push(normalCoords[normalIndex + 2]);
                             }
-                            indices.push(i);
+                            indices.push(j);
                         }
-                        groupObject = this.createTexturedTriangleMesh(materialName, coords, uvs, normals, indices);
+                        groupObject = this.createTexturedTriangleMesh(coords, uvs, normals, indices);
+                        if(materialName !== null)
+                            groupObject.addTexture(materialName);
+                        vertexIndices = [];
+                        textureIndices = [];
+                        normalIndices = [];
+                        // TODO: Work out mesh so that submeshes can refer to same verts/uvs/normals/indices
                     }
-                    if(meshName === null) {
+                    if(groupName === null)
                         mesh.addComponent(groupObject);
-                    } else {
-                        mesh.addComponent(groupObject, meshName);
-                    }
+                    else
+                        mesh.addComponent(groupObject, groupName);
                 }
-                meshName = tokens[1];
+                groupName = tokens[1];
             } else if(tokens[0] === 'usemtl') { // use material?
                 materialName = tokens[1];
             } else {
                 console.log(lines[i]);
             }
         }
-        console.info(`${geometryCoords.length/4} vertices loaded.`);
+        console.info(`${geometryCoords.length/4} geometry vertices loaded.`);
+        console.info(`${textureCoords.length/2} texture vertices loaded.`);
+        console.info(`${normalCoords.length/3} normal vertices loaded.`);
+
+        let components: InstancedObject[] = [];
+        for(let i = 0; i < mesh.components.length; ++i) {
+            let component = mesh.components[i];
+            component.addInstance(this.gl, window.mat4.create());
+            components.push(component);
+        }
+        for(let key in mesh.namedComponents) {
+            let component = mesh.namedComponents[key];
+            component.addInstance(this.gl, window.mat4.create());
+            components.push(component);
+        }
+        this.state.loadedObjects = this.state.loadedObjects.concat(components);
+
         return mesh;
     }
 
@@ -374,22 +339,6 @@ class Renderer {
         let zFar = 100.0;
         this.projectionMatrix = window.mat4.create();
         window.mat4.perspective(this.projectionMatrix, fieldOfView, aspect, zNear, zFar);
-    }
-
-    render(elapsedMs: number) {
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-        this.gl.useProgram(this.state.shader.program);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.projectionMatrix, false, this.projectionMatrix);
-        this.gl.uniformMatrix4fv(this.state.shader.uniformLocations.viewMatrix, false, this.camera.viewMatrix);
-        for(let key in this.state.loadedObjects) {
-            let obj = this.state.loadedObjects[key];
-            this.gl.bindVertexArray(obj.vao);
-            for(let i = 0; i < obj.textures.length; ++i) {
-                this.gl.activeTexture(this.gl.TEXTURE0 + i);
-                this.gl.bindTexture(this.gl.TEXTURE_2D, obj.textures[i]);
-            }
-            this.gl.drawElementsInstanced(obj.mode, obj.index.count, obj.index.type, obj.index.offset, obj.instances.count);
-        }
     }
 
     createPointsMesh(positions: number[], indices: number[]) : InstancedObject {
@@ -482,7 +431,7 @@ class Renderer {
         return builtObject;
     }
 
-    createTexturedLinesMesh(name: string, positions: number[], uvs: number[], indices: number[], loop: boolean = false) : InstancedObject {
+    createTexturedLinesMesh(positions: number[], uvs: number[], indices: number[], loop: boolean = false) : InstancedObject {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
@@ -526,7 +475,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        builtObject.textures = [this.state.loadedTextures[name].id];
         this.state.loadedObjects.push(builtObject);
         return builtObject;
     }
@@ -585,7 +533,7 @@ class Renderer {
         return builtObject;
     }
 
-    createTexturedTriangleMesh(name: string, positions: number[], uvs: number[], normals: number[], indices: number[]) : InstancedObject {
+    createTexturedTriangleMesh(positions: number[], uvs: number[], normals: number[], indices: number[]) : InstancedObject {
         let vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(vao);
 
@@ -610,7 +558,7 @@ class Renderer {
         let matrixBuf = this.gl.createBuffer();
         let vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, matrixBuf); // don't initialize any instances yet
-        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size , 0);
+        this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix, 4, this.gl.FLOAT, false, 4*vec4Size, 0);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 1, 4, this.gl.FLOAT, false, 4*vec4Size, vec4Size);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 2, 4, this.gl.FLOAT, false, 4*vec4Size, 2 * vec4Size);
         this.gl.vertexAttribPointer(this.state.shader.attribLocations.instanceMatrix + 3, 4, this.gl.FLOAT, false, 4*vec4Size, 3 * vec4Size);
@@ -635,7 +583,6 @@ class Renderer {
             type: this.gl.UNSIGNED_SHORT,
             offset: 0
         };
-        builtObject.textures = [this.state.loadedTextures[name].id];
         this.state.loadedObjects.push(builtObject);
         return builtObject;
     }

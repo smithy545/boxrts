@@ -2,7 +2,7 @@
     "uniforms": {
         "projectionMatrix": "uProjectionMatrix",
         "viewMatrix": "uViewMatrix",
-        "sampler": "uSampler"
+        "sampler0": "uSampler"
     },
     "attributes": {
         "vertexPosition": "aVertexPosition",
