@@ -32,6 +32,7 @@ import { ImageTexture } from "./ImageTexture.js";
 import { SpritesheetInfo } from "./SpritesheetInfo.js";
 import { TilesheetInfo } from "./TilesheetInfo.js";
 import { SceneNode } from "./SceneNode.js";
+import { Material } from "./Material.js";
 
 declare var window: any;
 
@@ -112,8 +113,34 @@ class Renderer {
                 const child = children[i];
                 const objects = child.objects;
                 for(let j = 0; j < objects.length; ++j) {
-                    let obj = objects[j];
+                    const obj = objects[j];
                     this.gl.bindVertexArray(obj.vao);
+                    if(obj.material !== null && obj.material in this.state.loadedMaterials) {
+                        const material = this.state.loadedMaterials[obj.material];
+                        // TODO: Render by material to avoid redundant uniform binds
+                        this.gl.uniform3f(
+                            this.state.shader.uniformLocations[`material.ambientColor`],
+                            material.ambientColor[0],
+                            material.ambientColor[1],
+                            material.ambientColor[2]);
+                        this.gl.uniform3f(this.state.shader.uniformLocations[`material.diffuseColor`],
+                            material.diffuseColor[0],
+                            material.diffuseColor[1],
+                            material.diffuseColor[2]);
+                        this.gl.uniform3f(this.state.shader.uniformLocations[`material.specularColor`],
+                            material.specularColor[0],
+                            material.specularColor[1],
+                            material.specularColor[2]);
+                        this.gl.uniform3f(this.state.shader.uniformLocations[`material.transmissionFilter`],
+                            material.transmissionFilter[0],
+                            material.transmissionFilter[1],
+                            material.transmissionFilter[2]);
+                        this.gl.uniform1f(this.state.shader.uniformLocations[`material.illuminationModel`], material.illuminationModel);
+                        this.gl.uniform1f(this.state.shader.uniformLocations[`material.dissolveFactor`], material.dissolveFactor);
+                        this.gl.uniform1f(this.state.shader.uniformLocations[`material.specularExponent`], material.specularExponent);
+                        this.gl.uniform1f(this.state.shader.uniformLocations[`material.sharpness`], material.sharpness);
+                        this.gl.uniform1f(this.state.shader.uniformLocations[`material.refractionIndex`], material.refractionIndex);
+                    }
                     for(let k = 0; k < obj.textures.length; ++k) {
                         this.gl.uniform1i(this.state.shader.uniformLocations[`sampler${k}`], k);
                         this.gl.activeTexture(this.gl.TEXTURE0 + k);
@@ -128,32 +155,94 @@ class Renderer {
     }
 
     getMesh(name: string) : Mesh | null{
-        for(let i = 0; i < this.state.loadedMeshes.length; ++i) {
-            if(name === this.state.loadedMeshes[i].name)
-                return this.state.loadedMeshes[i];
-        }
+        if(name in this.state.loadedMeshes)
+            return this.state.loadedMeshes[name];
         return null;
     }
 
-    loadMeshObject(data: string, name?: string) : Mesh {
+    loadMaterialFile(data: string) : {[name: string]: Material} {
+        const materials : {[name: string]: Material} = {};
+        let materialName: string = null;
+
+        // TODO: Handle optional parameters properly to fully support .mtl file format
+         // currently use "K r g b" format, no spectral file or xyz format support
+        const lines = data.split(/\n/);
+        for(let i = 0; i < lines.length; ++i) {
+            let inComment = false;
+            const tokens = lines[i].split(/\s/).filter((token: string) => {
+                if(token === '#')
+                    inComment = true;
+                return !inComment && token.length > 0;
+            });
+            if(tokens.length === 0)
+                continue;
+            if(tokens[0] === 'Ka') {
+                materials[materialName].ambientColor[0] = parseFloat(tokens[1]);
+                materials[materialName].ambientColor[1] = parseFloat(tokens[2]);
+                materials[materialName].ambientColor[2] = parseFloat(tokens[3]);
+            } else if(tokens[0] === 'Kd') {
+                materials[materialName].diffuseColor[0] = parseFloat(tokens[1]);
+                materials[materialName].diffuseColor[1] = parseFloat(tokens[2]);
+                materials[materialName].diffuseColor[2] = parseFloat(tokens[3]);
+            } else if(tokens[0] === 'Ks') {
+                materials[materialName].specularColor[0] = parseFloat(tokens[1]);
+                materials[materialName].specularColor[1] = parseFloat(tokens[2]);
+                materials[materialName].specularColor[2] = parseFloat(tokens[3]);
+            } else if(tokens[0] === 'Tf') {
+                materials[materialName].transmissionFilter[0] = parseFloat(tokens[1]);
+                materials[materialName].transmissionFilter[1] = parseFloat(tokens[2]);
+                materials[materialName].transmissionFilter[2] = parseFloat(tokens[3]);
+            } else if(tokens[0] === 'd') {
+                materials[materialName].dissolveFactor = parseFloat(tokens[1]);
+            } else if(tokens[0] === 'illum') {
+                materials[materialName].illuminationModel = parseInt(tokens[1]);
+            } else if(tokens[0] === 'Ns') {
+                materials[materialName].specularExponent = parseFloat(tokens[1]);
+            } else if(tokens[0] === 'sharpness') {
+                materials[materialName].sharpness = parseFloat(tokens[1]);
+            } else if(tokens[0] === 'Ni') {
+                materials[materialName].refractionIndex = parseFloat(tokens[1]);
+            } else if(tokens[0] === 'newmtl') {
+                materialName = tokens[1];
+                materials[materialName] = {
+                    ambientColor: new Float32Array(3),
+                    diffuseColor: new Float32Array(3),
+                    specularColor: new Float32Array(3),
+                    transmissionFilter: new Float32Array(3),
+                    illuminationModel: 1,
+                    dissolveFactor: 1.0,
+                    specularExponent: 1,
+                    sharpness: 60,
+                    refractionIndex: 1.0
+                };
+            }
+        }
+        return materials;
+    }
+
+    loadObjFile(data: string, name: string = null) : Mesh {
         let geometryCoords: number[] = [];
         let textureCoords: number[] = [];
         let normalCoords: number[] = [];
         let vertexIndices: number[] = [];
         let textureIndices: number[] = [];
         let normalIndices: number[] = [];
-        let groupName = null;
-        let materialName = null;
-        let mode = this.gl.TRIANGLES;
-        let mesh = new Mesh(name);
+        let groupName: string = null;
+        let materialName: string = null;
+        let mode: GLenum = this.gl.TRIANGLES;
+        const mesh: Mesh = new Mesh();
 
         // TODO: handle Bezier curves, 3D textures and other cool shit like that
+        // TODO: Handle optional parameters properly to fully support .obj file format
         const lines = data.split(/\n/).concat(['g']);
         for(let i = 0; i < lines.length; ++i) {
+            let inComment = false;
             const tokens = lines[i].split(/\s/).filter((token: string) => {
-                return token.length > 0;
+                if(token === '#')
+                    inComment = true;
+                return !inComment && token.length > 0;
             });
-            if(tokens.length === 0 || tokens[0].length === 0)
+            if(tokens.length === 0)
                 continue;
             if(tokens[0] === 'v') { // vertex coords
                 geometryCoords = geometryCoords.concat([
@@ -191,9 +280,30 @@ class Renderer {
                 }
                 mode = this.gl.LINES;
             } else if (tokens[0] === 'mtllib') { // associated .mtl file
-                // TODO: mats
+                const path = tokens[1];
+                const pathRegex = /(.*\/)*(.+)(\.mtl)*/;
+                const matches = path.match(pathRegex);
+                if(matches === null) // always matches if path.length > 0
+                    continue;
+                else {
+                    const location = matches[0];
+                    const name = matches[1];
+                    const fileType = matches[2];
+                    if(name in this.state.loadedMaterials)
+                        continue;
+                    loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
+                        console.info(`Material library file loaded at ${path}:`);
+                        const newMaterials = this.loadMaterialFile(req.responseText);
+                        for(let key in newMaterials) {
+                            if(key in this.state.loadedMaterials)
+                                console.error(`${key} already loaded material`);
+                            else
+                                this.state.loadedMaterials[name] = newMaterials[key];
+                        }
+                    });
+                }
             } else if(tokens[0] === 'o') { // new model name
-                mesh.name = tokens[1];
+                name = tokens[1];
             } else if(tokens[0] === 'g') { // new polygon group
                 if(vertexIndices.length > 0) {
                     let groupObject: InstancedObject;
@@ -228,7 +338,7 @@ class Renderer {
                         }
                         groupObject = this.createLinesMesh(coords, uvs, indices, ((coords.length/4) % 2) !== 0);
                         if(materialName !== null)
-                            groupObject.addTexture(materialName);
+                            groupObject.setMaterial(materialName);
                     } else if(mode === this.gl.TRIANGLES) {
                         let coords = [];
                         let uvs = [];
@@ -256,7 +366,7 @@ class Renderer {
                         }
                         groupObject = this.createTexturedTriangleMesh(coords, uvs, normals, indices);
                         if(materialName !== null)
-                            groupObject.addTexture(materialName);
+                            groupObject.setMaterial(materialName);
                         vertexIndices = [];
                         textureIndices = [];
                         normalIndices = [];
@@ -266,11 +376,13 @@ class Renderer {
                         mesh.addComponent(groupObject);
                     else
                         mesh.addComponent(groupObject, groupName);
+                    // TODO: Only add meshes on first instancing
                     this.state.sceneRoot.addObject(groupObject); // add for later instancing
                 }
                 groupName = tokens[1];
-            } else if(tokens[0] === 'usemtl') { // use material?
+            } else if(tokens[0] === 'usemtl') { // turn on material
                 materialName = tokens[1];
+            } else if(tokens[0] === 'usemap') { // use map?
             } else {
                 console.log(lines[i]);
             }
@@ -278,7 +390,8 @@ class Renderer {
         console.info(`${geometryCoords.length/4} geometry vertices loaded.`);
         console.info(`${textureCoords.length/2} texture vertices loaded.`);
         console.info(`${normalCoords.length/3} normal vertices loaded.`);
-        this.state.loadedMeshes.push(mesh);
+        if(name !== null) // for now leave unnamed meshes unloaded because we can't find them easily
+            this.state.loadedMeshes[name] = mesh;
         return mesh;
     }
 
@@ -591,6 +704,7 @@ class Renderer {
             loadFile(fragmentFilePath, (xhr) => {
                 const fragShaderCode = xhr.responseText;
                 loadFile(vertexFilePath, (xhr) => {
+                    console.info(`Reading shader ${name} for opengl...`);
                     const vertexShaderCode = xhr.responseText;
                     const program = this.loadShaderProgramFromSource(vertexShaderCode, fragShaderCode);
                     if(program === null) {

@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { Material } from "./Material.js";
 import { Mesh } from "./Mesh.js";
 import { ShaderProgram } from "./ShaderProgram.js";
 import { ImageTexture } from "./ImageTexture.js";
@@ -31,14 +32,16 @@ class RenderState {
     activeShader: string;
     loadedShaders: {[name: string]: ShaderProgram};
     loadedTextures: {[name: string]: ImageTexture};
-    loadedMeshes: Mesh[];
+    loadedMeshes: {[name: string]: Mesh};
+    loadedMaterials: {[name: string]: Material};
     sceneRoot: SceneNode;
 
     constructor(sceneRoot: SceneNode) {
         this.activeShader = "";
         this.loadedShaders = {};
         this.loadedTextures = {};
-        this.loadedMeshes = [];
+        this.loadedMeshes = {};
+        this.loadedMaterials = {};
         this.sceneRoot = sceneRoot;
     }
 

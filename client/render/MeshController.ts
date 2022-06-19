@@ -26,6 +26,8 @@ SOFTWARE.
 import { Mesh } from "./Mesh.js";
 
 
+declare var window: any;
+
 class MeshController {
     mesh: Mesh;
     instanceIds: number[];
@@ -39,6 +41,37 @@ class MeshController {
             this.instanceIds.push(mesh.components[i].addInstance(gl));
         for(let key in mesh.namedComponents)
             this.namedInstanceIds[key] = mesh.namedComponents[key].addInstance(gl);
+    }
+
+    translate(gl: WebGL2RenderingContext, x: number, y: number, z: number) {
+        const translation = [x, y, z];
+        for(let i = 0; i < this.instanceIds.length; ++i) {
+            const id = this.instanceIds[i];
+            const obj = this.mesh.components[i];
+            const out = obj.getInstanceData(id);
+            window.mat4.translate(out, out, translation);
+            obj.modifyInstanceData(gl, id, out);
+        }
+        for(let key in this.namedInstanceIds) {
+            const id = this.namedInstanceIds[key];
+            const obj = this.mesh.namedComponents[key];
+            const out = obj.getInstanceData(id);
+            window.mat4.translate(out, out, translation);
+            obj.modifyInstanceData(gl, id, out);
+        }
+    }
+
+    setTransform(gl: WebGL2RenderingContext, transform: Float32Array) {
+        for(let i = 0; i < this.instanceIds.length; ++i) {
+            const id = this.instanceIds[i];
+            const obj = this.mesh.components[i];
+            obj.modifyInstanceData(gl, id, transform);
+        }
+        for(let key in this.namedInstanceIds) {
+            const id = this.namedInstanceIds[key];
+            const obj = this.mesh.namedComponents[key];
+            obj.modifyInstanceData(gl, id, transform);
+        }
     }
 };
 

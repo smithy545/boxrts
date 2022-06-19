@@ -6,12 +6,17 @@
             "description": "Hi, hello, howdy."
         }
     },
-    "shaders": ["color", "texture"],
-    "objects": ["basicCharacter.obj"],
+    "shaders": [
+        "color",
+        "texture"
+    ],
+    "objects": [
+        "basicCharacter.obj",
+        "wheel.obj"
+    ],
     "images": [
         "medieval_tilesheet.png",
         "scifi_tilesheet.png",
-        "face_adventurer.png",
         "skin_adventurer.png"
     ]
 }

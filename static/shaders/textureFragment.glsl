@@ -1,32 +1,23 @@
-/*
-MIT License
+#version 300 es
 
-Copyright (c) 2022 Philip Arturo Smith
+struct Material {
+    mediump vec3 ambientColor;
+    mediump vec3 diffuseColor;
+    mediump vec3 specularColor;
+    mediump vec3 transmissionFilter;
+    mediump float illuminationModel;
+    mediump float dissolveFactor;
+    mediump float specularExponent;
+    mediump float sharpness;
+    mediump float refractionIndex;
+};
+in mediump vec2 vTextureCoord;
+in mediump vec3 vNormalCoord;
+out mediump vec4 vFragColor;
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
-varying highp vec2 vTextureCoord;
-varying highp vec3 vNormalCoord;
-
+uniform Material uMaterial;
 uniform sampler2D uSampler;
 
 void main(void) {
-    gl_FragColor = texture2D(uSampler, vTextureCoord);
+    vFragColor = texture(uSampler, vTextureCoord);
 }

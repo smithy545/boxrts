@@ -25,6 +25,7 @@ SOFTWARE.
 import { MeshController } from "./render/MeshController.js";
 import { InstancedObject } from "./render/InstancedObject.js";
 import { Renderer } from "./render/Renderer.js";
+import { MainLoop } from "./MainLoop.js";
 
 
 declare var window: any;
@@ -35,7 +36,7 @@ class Scene {
 
     constructor() {}
 
-    setup(renderer: Renderer) {
+    setup(renderer: Renderer, loop: MainLoop) {
         // floor verts/colors/indices
         const positions = [
             0, 0, 0, 1,
@@ -45,9 +46,9 @@ class Scene {
         ];
         const normals = [
             0, 0, 0,
-            0, 0, 1,
-            1, 0, 0,
-            1, 0, 1
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0
         ];
         let width = 1760.;
         let height = 704.;
@@ -69,8 +70,10 @@ class Scene {
         const indices = [0, 1, 2, 3, 2, 1];
         this.instancedFloor = renderer.createTexturedTriangleMesh(positions, uvs, normals, indices);
         this.instancedFloor.addTexture("medieval_tilesheet");
+        renderer.state.sceneRoot.addObject(this.instancedFloor);
 
         const playerMesh = renderer.getMesh("basicCharacter");
+        playerMesh.addTextureToComponents("skin_adventurer");
         this.playerController = new MeshController(renderer.gl, playerMesh);
 
         const N = 20;

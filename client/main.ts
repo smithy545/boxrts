@@ -136,7 +136,7 @@ function main() {
                         loadFile(`./objects/${path}`, (req: XMLHttpRequest) => {
                             objectFileStatus[path] = true;
                             console.info(`Object loaded at ${path}:`);
-                            console.info(renderer.loadMeshObject(req.responseText, name));
+                            renderer.loadObjFile(req.responseText, name); // Throwaway returned meshes
                         }, (ev) => {
                             console.error(ev);
                         }, "application/obj");
@@ -150,7 +150,7 @@ function main() {
                     return true;
                 }, () => {
                     console.info("Loading initial scene...");
-                    scene.setup(renderer);
+                    scene.setup(renderer, mainLoop);
 
                     console.info("Starting game loop.");
                     let previousTimestamp: DOMHighResTimeStamp = 0;

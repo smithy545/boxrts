@@ -2,7 +2,15 @@
     "uniforms": {
         "projectionMatrix": "uProjectionMatrix",
         "viewMatrix": "uViewMatrix",
-        "sampler0": "uSampler"
+        "sampler0": "uSampler",
+        "material.ambientColor": "uMaterial.ambientColor",
+        "material.diffuseColor": "uMaterial.diffuseColor",
+        "material.specularColor": "uMaterial.specularColor",
+        "material.transmissionFilter": "uMaterial.transmissionFilter",
+        "material.illuminationModel": "uMaterial.illuminationModel",
+        "material.specularExponent": "uMaterial.specularExponent",
+        "material.sharpness": "uMaterial.sharpness",
+        "material.refractionIndex": "uMaterial.refractionIndex"
     },
     "attributes": {
         "vertexPosition": "aVertexPosition",

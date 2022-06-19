@@ -22,31 +22,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { InstancedObject }  from "./InstancedObject.js";
-
-class Mesh {
-    components: InstancedObject[];
-    namedComponents: {[name: string]: InstancedObject};
-
-    constructor() {
-        this.components = []
-        this.namedComponents = {};
-    }
-
-    addComponent(childObject: InstancedObject, name?: string) {
-        if(name !== undefined)
-            this.namedComponents[name] = childObject;
-        else
-            this.components.push(childObject);
-    }
-
-    addTextureToComponents(textureName: string) {
-        for(let k = 0; k < this.components.length; ++k)
-            this.components[k].addTexture(textureName);
-        for(let k in this.namedComponents)
-            this.namedComponents[k].addTexture(textureName);
-    }
+interface Material {
+    ambientColor: Float32Array;
+    diffuseColor: Float32Array;
+    specularColor: Float32Array;
+    transmissionFilter: Float32Array;
+    illuminationModel: number;
+    dissolveFactor: number;
+    specularExponent: number;
+    sharpness: number;
+    refractionIndex: number;
 };
 
 
-export { Mesh };
+export { Material };

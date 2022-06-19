@@ -32,8 +32,8 @@ interface IndexAttribute {
     offset: number;
 };
 
-interface InstanceList {
-    data?: Float32Array;
+class InstanceList {
+    data: Float32Array;
     count: number;
     buffer: WebGLBuffer;
 };
@@ -45,15 +45,18 @@ class InstancedObject {
     private _index: IndexAttribute
     private _mode: GLenum;
     private _textures: string[];
+    private _material: string;
 
     constructor(vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer, mode: GLenum) {
         this._vao = vao;
         this._instances = {
-            buffer: matrixBuffer,
-            count: 0
+            data: new Float32Array(0),
+            count: 0,
+            buffer: matrixBuffer
         };
         this._mode = mode;
         this._textures = [];
+        this._material = null;
     }
 
     clone(gl: WebGL2RenderingContext, vao: WebGLVertexArrayObject, matrixBuffer: WebGLBuffer) : InstancedObject {
@@ -68,7 +71,11 @@ class InstancedObject {
     get textures() : string[] {
         return this._textures;
     }
-    
+
+    get material() : string {
+        return this._material;
+    }
+
     get mode() : GLenum {
         return this._mode;
     }
@@ -110,15 +117,27 @@ class InstancedObject {
         return this._instances.count - 1;
     }
 
-    modifyInstance(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
-        let offset = 4*4*instanceIndex;
+    modifyInstanceData(gl: WebGL2RenderingContext, instanceIndex: number, instanceData: Float32Array) {
+        const offset = 4*4*instanceIndex;
         this._instances.data.set(instanceData, offset);
         gl.bindBuffer(gl.ARRAY_BUFFER, this._instances.buffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, offset * Float32Array.BYTES_PER_ELEMENT, instanceData);
     }
 
-    addTexture(texture: string) {
-        this._textures.push(texture);
+    getInstanceData(instanceIndex: number) : Float32Array {
+        const offset = 16*instanceIndex;
+        const out = new Float32Array(16);
+        for(let i = 0; i < 16; ++i)
+            out[i] = this._instances.data[offset + i];
+        return out;
+    }
+
+    setMaterial(materialName: string) {
+        this._material = materialName;
+    }
+
+    addTexture(textureName: string) {
+        this._textures.push(textureName);
     }
 };
 
